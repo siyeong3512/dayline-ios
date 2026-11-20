@@ -333,10 +333,12 @@ struct AppSettings: Codable, Equatable {
     var customTone: CustomTone?
     /// 실험: 카톡처럼 왼쪽에 보낸 사람 사진(커뮤니케이션 알림)
     var chatStyle = false
+    /// 잠금화면·다이내믹 아일랜드 '다음 일정' 카드
+    var liveActivity = true
 
     init() {}
 
-    enum CodingKeys: String, CodingKey { case tone, voiceEnabled, voiceID, theme, customTone, chatStyle }
+    enum CodingKeys: String, CodingKey { case tone, voiceEnabled, voiceID, theme, customTone, chatStyle, liveActivity }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -346,6 +348,7 @@ struct AppSettings: Codable, Equatable {
         theme = (try? c.decode(ThemeMode.self, forKey: .theme)) ?? .system
         customTone = try? c.decode(CustomTone.self, forKey: .customTone)
         chatStyle = (try? c.decode(Bool.self, forKey: .chatStyle)) ?? false
+        liveActivity = (try? c.decode(Bool.self, forKey: .liveActivity)) ?? true
     }
 
     /// 나만의 말투를 골랐는데 파일이 없으면 '친구처럼'으로

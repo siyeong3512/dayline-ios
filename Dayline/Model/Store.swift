@@ -265,5 +265,6 @@ final class Store: ObservableObject {
         let snapshotItems = items
         let snapshotSettings = settings
         Task { await NotificationScheduler.shared.reschedule(items: snapshotItems, settings: snapshotSettings) }
+        LiveActivityManager.refresh(store: self)
     }
 }

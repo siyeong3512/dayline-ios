@@ -16,3 +16,4 @@ xcuserdata/
 # 개인 말투 파일·대화 기록은 절대 올리지 않기
 *tone*.json
 KakaoTalk*.txt
+DaylineWidgets/Info.plist

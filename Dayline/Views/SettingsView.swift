@@ -42,6 +42,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 notificationSection
+                liveActivitySection
                 toneSection
                 voiceSection
                 Section("화면") {
@@ -124,6 +125,30 @@ struct SettingsView: View {
         case .denied: return "꺼짐"
         case .notDetermined: return "아직 묻지 않음"
         @unknown default: return "알 수 없음"
+        }
+    }
+
+    // MARK: 라이브 액티비티
+
+    private var liveActivitySection: some View {
+        Section {
+            Toggle("다음 일정 카드", isOn: $store.settings.liveActivity)
+            if store.settings.liveActivity {
+                Button("다음 일정으로 지금 띄워보기") {
+                    if !LiveActivityManager.isAvailable {
+                        notice = "아이폰 설정 > Dayline > 실시간 현황(라이브 액티비티)이 꺼져 있어요. 켠 뒤 다시 눌러주세요."
+                    } else if store.upNext() == nil {
+                        notice = "다가오는 일정이 없어요. 시간표나 약속을 먼저 추가해 주세요."
+                    } else {
+                        LiveActivityManager.refresh(store: store, force: true)
+                        notice = "잠금화면과 다이내믹 아일랜드를 확인해 보세요. 안 보이면 SideStore 설치 때 확장 처리 방식을 바꿔야 할 수 있어요."
+                    }
+                }
+            }
+        } header: {
+            Text("잠금화면 · 다이내믹 아일랜드")
+        } footer: {
+            Text("다음 일정이 3시간 안이면 앱을 열 때 잠금화면과 다이내믹 아일랜드에 카운트다운 카드가 떠요. iOS 제한 때문에 앱을 연 뒤에만 새로 시작되고, 최대 8시간까지 유지돼요.")
         }
     }
 

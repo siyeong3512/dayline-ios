@@ -10,12 +10,19 @@ settings:
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: ""
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGN_IDENTITY: ""
 targets:
   Dayline:
     type: application
     platform: iOS
     sources:
       - path: Dayline
+      - path: Shared
+    dependencies:
+      - target: DaylineWidgets
+        embed: true
     scheme: {}
     settings:
       base:
@@ -24,9 +31,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: "YES"
-        CODE_SIGNING_ALLOWED: "NO"
-        CODE_SIGNING_REQUIRED: "NO"
-        CODE_SIGN_IDENTITY: ""
         CODE_SIGN_ENTITLEMENTS: Dayline/Dayline.entitlements
     info:
       path: Dayline/Info.plist
@@ -41,5 +45,29 @@ targets:
           - UIInterfaceOrientationPortrait
         NSUserActivityTypes:
           - INSendMessageIntent
+        NSSupportsLiveActivities: true
         LSSupportsOpeningDocumentsInPlace: false
         UIFileSharingEnabled: false
+
+  # 잠금화면·다이내믹 아일랜드 라이브 액티비티
+  DaylineWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: DaylineWidgets
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.dayline.ios.widgets
+        PRODUCT_NAME: DaylineWidgets
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: "YES"
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+    info:
+      path: DaylineWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Dayline
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
