@@ -57,13 +57,13 @@ struct NextUpLiveActivity: Widget {
                         .padding(.top, 8)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Bar(state: s)
-                        if let line = s.line {
-                            Text(line).font(.subheadline).lineLimit(2)
-                        }
+                    if let line = s.line {
+                        Text(line)
+                            .font(.subheadline)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
                     }
-                    .padding(.horizontal, 4)
                 }
             } compactLeading: {
                 Face(state: s, size: 24)
@@ -112,20 +112,6 @@ struct Countdown: View {
     }
 }
 
-/// 카드를 띄운 때부터 시작 시각까지 차오르는 진행 바 (iOS가 직접 갱신)
-struct Bar: View {
-    let state: NextUpAttributes.ContentState
-
-    var body: some View {
-        ProgressView(timerInterval: state.from...max(state.from.addingTimeInterval(1), state.start),
-                     countsDown: false,
-                     label: { EmptyView() },
-                     currentValueLabel: { EmptyView() })
-            .progressViewStyle(.linear)
-            .tint(WidgetTheme.accent)
-    }
-}
-
 struct NextUpLockScreen: View {
     let state: NextUpAttributes.ContentState
     /// 시작 시각이 지나면 true (staleDate = 시작 시각)
@@ -133,48 +119,48 @@ struct NextUpLockScreen: View {
 
     private var kind: String { state.kindLabel == "시간표" ? "수업" : "약속" }
 
+    /// 1시간 넘게 남으면 "1:16:23"(7자리), 아니면 "16:23"(5자리)이라 숫자 칸 폭을 다르게 잡는다
+    private var countdownWidth: CGFloat { state.start.timeIntervalSinceNow >= 3600 ? 138 : 98 }
+
     // 잠금화면 라이브 액티비티는 높이가 약 160pt로 제한돼서, 세 줄 안에 모두 넣는다.
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // 1줄: 사진 | 제목 / 시간·장소
+        VStack(alignment: .leading, spacing: 8) {
+            // 1줄: 사진 | 다음 수업 / 제목 | 남은 시간(크게)
             HStack(alignment: .center, spacing: 12) {
                 Face(state: state, size: 56)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("다음 \(kind)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(WidgetTheme.sub)
                     Text(state.title)
                         .font(.system(size: 19, weight: .bold))
                         .foregroundStyle(WidgetTheme.text)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text("다음 \(kind) · " + (state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place))
-                        .font(.system(size: 13))
-                        .foregroundStyle(WidgetTheme.sub)
-                        .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
-                Spacer(minLength: 0)
-            }
-
-            // 2줄: 남은 시간 + 진행 바
-            if started {
-                Text("시작했어요")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(WidgetTheme.accent)
-            } else {
-                HStack(alignment: .center, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if started {
+                    Text("시작했어요")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(WidgetTheme.accent)
+                } else {
+                    VStack(alignment: .trailing, spacing: 0) {
                         Countdown(state: state)
-                            .font(.system(size: 22, weight: .heavy, design: .rounded))
+                            .font(.system(size: 32, weight: .heavy, design: .rounded))
                             .foregroundStyle(WidgetTheme.accent)
-                            .multilineTextAlignment(.leading)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(width: 104, alignment: .leading)
+                            .minimumScaleFactor(0.6)
+                            .frame(width: countdownWidth, alignment: .trailing)
                         Text("남음").font(.system(size: 12)).foregroundStyle(WidgetTheme.sub)
                     }
-                    .fixedSize()
-                    Bar(state: state)
                 }
             }
+
+            // 2줄: 시간 · 장소
+            Text(state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place)
+                .font(.system(size: 13))
+                .foregroundStyle(WidgetTheme.sub)
+                .lineLimit(1)
 
             // 3줄: 보낸 사람 + 잔소리 (최대 2줄)
             if let line = state.line, !started {
