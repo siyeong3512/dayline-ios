@@ -235,7 +235,7 @@ struct TodoItem: Identifiable, Codable, Hashable {
 // MARK: - 설정
 
 enum NagTone: String, Codable, CaseIterable, Identifiable {
-    case plain, gentle, friend, strict
+    case plain, gentle, friend, strict, custom
     var id: String { rawValue }
     var label: String {
         switch self {
@@ -243,7 +243,61 @@ enum NagTone: String, Codable, CaseIterable, Identifiable {
         case .gentle: return "순한 응원"
         case .friend: return "친구처럼"
         case .strict: return "빡센 잔소리"
+        case .custom: return "나만의 말투"
         }
+    }
+}
+
+/// 사용자가 파일로 가져오는 말투. 앱 안(설정 파일)에만 저장되고 코드·저장소에는 들어가지 않는다.
+/// 문장 안의 {title} {left} {place} {time}은 일정 정보로 바뀐다.
+struct CustomTone: Codable, Equatable {
+    var name: String
+    /// 2시간 이상 전
+    var early: [String]
+    /// 30분~1시간 전
+    var soon: [String]
+    /// 10분 전
+    var urgent: [String]
+
+    enum CodingKeys: String, CodingKey { case name, early, soon, urgent }
+
+    init(name: String, early: [String], soon: [String], urgent: [String]) {
+        self.name = name
+        self.early = early
+        self.soon = soon
+        self.urgent = urgent
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = (try? c.decode(String.self, forKey: .name)) ?? "나만의 말투"
+        early = ((try? c.decode([String].self, forKey: .early)) ?? []).filter { !$0.isEmpty }
+        soon = ((try? c.decode([String].self, forKey: .soon)) ?? []).filter { !$0.isEmpty }
+        urgent = ((try? c.decode([String].self, forKey: .urgent)) ?? []).filter { !$0.isEmpty }
+    }
+
+    var isUsable: Bool { !(early.isEmpty && soon.isEmpty && urgent.isEmpty) }
+    var count: Int { early.count + soon.count + urgent.count }
+
+    /// 비어 있는 단계는 다른 단계 문장으로 채운다
+    func pool(stage: Int) -> [String] {
+        let order: [[String]]
+        switch stage {
+        case 0: order = [early, soon, urgent]
+        case 1: order = [soon, early, urgent]
+        default: order = [urgent, soon, early]
+        }
+        return order.first { !$0.isEmpty } ?? []
+    }
+
+    /// {"format": "dayline-tone", ...} 파일인지 확인하고 읽는다
+    static func decodeFile(_ data: Data) -> CustomTone? {
+        struct Header: Decodable { let format: String? }
+        guard let header = try? JSONDecoder().decode(Header.self, from: data),
+              header.format == "dayline-tone",
+              let tone = try? JSONDecoder().decode(CustomTone.self, from: data),
+              tone.isUsable else { return nil }
+        return tone
     }
 }
 
@@ -271,10 +325,11 @@ struct AppSettings: Codable, Equatable {
     var voiceEnabled = false
     var voiceID: String?
     var theme: ThemeMode = .system
+    var customTone: CustomTone?
 
     init() {}
 
-    enum CodingKeys: String, CodingKey { case tone, voiceEnabled, voiceID, theme }
+    enum CodingKeys: String, CodingKey { case tone, voiceEnabled, voiceID, theme, customTone }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -282,6 +337,12 @@ struct AppSettings: Codable, Equatable {
         voiceEnabled = (try? c.decode(Bool.self, forKey: .voiceEnabled)) ?? false
         voiceID = try? c.decode(String.self, forKey: .voiceID)
         theme = (try? c.decode(ThemeMode.self, forKey: .theme)) ?? .system
+        customTone = try? c.decode(CustomTone.self, forKey: .customTone)
+    }
+
+    /// 나만의 말투를 골랐는데 파일이 없으면 '친구처럼'으로
+    var effectiveTone: NagTone {
+        tone == .custom && !(customTone?.isUsable ?? false) ? .friend : tone
     }
 }
 

@@ -3,9 +3,12 @@ import Foundation
 /// 알림 문구(잔소리). 같은 일정·같은 알림 시점이면 늘 같은 문장을 골라서,
 /// 목소리 파일도 다시 만들 필요가 없게 한다.
 enum Nag {
-    static func line(tone: NagTone, item: ScheduleItem, minutesBefore n: Int) -> String {
-        let pool = templates(tone: tone, minutesBefore: n)
-        let pick = pool[Int(stableHash("\(item.id)|\(n)|\(tone.rawValue)") % UInt64(pool.count))]
+    static func line(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int) -> String {
+        let tone = settings.effectiveTone
+        let pool = templates(settings: settings, tone: tone, minutesBefore: n)
+        guard !pool.isEmpty else { return "\(ReminderOption.amount(n)) 뒤 시작해요." }
+        let seed = "\(item.id)|\(n)|\(tone.rawValue)|\(settings.customTone?.name ?? "")"
+        let pick = pool[Int(stableHash(seed) % UInt64(pool.count))]
         return pick
             .replacingOccurrences(of: "{left}", with: ReminderOption.amount(n))
             .replacingOccurrences(of: "{title}", with: item.title)
@@ -14,23 +17,44 @@ enum Nag {
     }
 
     /// 알림 본문: 잔소리 + 시간·장소
-    static func body(tone: NagTone, item: ScheduleItem, minutesBefore n: Int) -> String {
+    static func body(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int) -> String {
         let info = item.place.isEmpty ? item.time : "\(item.time) · \(item.place)"
-        if tone == .plain { return "\(ReminderOption.label(n)) · \(info)" }
-        return line(tone: tone, item: item, minutesBefore: n) + "\n" + info
+        if settings.effectiveTone == .plain { return "\(ReminderOption.label(n)) · \(info)" }
+        return line(settings: settings, item: item, minutesBefore: n) + "\n" + info
     }
 
-    /// 목소리로 읽을 문장
-    static func spoken(tone: NagTone, item: ScheduleItem, minutesBefore n: Int) -> String {
-        if tone == .plain { return "\(item.title), \(ReminderOption.amount(n)) 뒤에 시작해요." }
-        return "\(item.title). " + line(tone: tone, item: item, minutesBefore: n)
+    /// 목소리로 읽을 문장 (ㅋㅋ·ㅏ·이모지처럼 TTS가 이상하게 읽는 글자는 뺀다)
+    static func spoken(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int) -> String {
+        if settings.effectiveTone == .plain { return "\(item.title), \(ReminderOption.amount(n)) 뒤에 시작해요." }
+        let text = line(settings: settings, item: item, minutesBefore: n)
+        if settings.effectiveTone == .custom { return speakable(text) }
+        return "\(item.title). " + text
     }
 
-    private static func templates(tone: NagTone, minutesBefore n: Int) -> [String] {
-        let stage = n <= 10 ? 2 : n <= 60 ? 1 : 0
+    static func speakable(_ s: String) -> String {
+        var out = ""
+        for scalar in s.unicodeScalars {
+            let v = scalar.value
+            let isJamo = (0x3131...0x318E).contains(v)           // ㅋ ㅎ ㅏ ㅠ 같은 낱자
+            let isEmoji = scalar.properties.isEmojiPresentation || (0x1F000...0x1FAFF).contains(v)
+                || (0x2600...0x27BF).contains(v) || v == 0xFE0F || v == 0x200D
+            if isJamo || isEmoji { continue }
+            out.unicodeScalars.append(scalar == "~" ? " " : scalar)
+        }
+        var collapsed = out.replacingOccurrences(of: #"([!?.])\1+"#, with: "$1", options: .regularExpression)
+        collapsed = collapsed.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
+        return collapsed.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func stage(_ n: Int) -> Int { n <= 10 ? 2 : n <= 60 ? 1 : 0 }
+
+    private static func templates(settings: AppSettings, tone: NagTone, minutesBefore n: Int) -> [String] {
+        let stage = stage(n)
         switch tone {
         case .plain:
             return ["{left} 뒤 시작해요."]
+        case .custom:
+            return settings.customTone?.pool(stage: stage) ?? []
         case .gentle:
             return [
                 ["{title}까지 {left} 남았어요. 천천히 준비해요.",

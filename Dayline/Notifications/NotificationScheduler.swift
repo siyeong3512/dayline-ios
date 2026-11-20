@@ -90,11 +90,11 @@ actor NotificationScheduler {
         for p in list {
             let content = UNMutableNotificationContent()
             content.title = p.item.title
-            content.body = Nag.body(tone: settings.tone, item: p.item, minutesBefore: p.minutesBefore)
+            content.body = Nag.body(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
             content.threadIdentifier = p.item.id
             content.sound = .default
             if settings.voiceEnabled {
-                let text = Nag.spoken(tone: settings.tone, item: p.item, minutesBefore: p.minutesBefore)
+                let text = Nag.spoken(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
                 if let name = await voice.soundFile(text: text, voiceID: settings.voiceID) {
                     usedSounds.insert(name)
                     content.sound = UNNotificationSound(named: UNNotificationSoundName(name))
@@ -117,10 +117,10 @@ actor NotificationScheduler {
                                   time: Day.clock(Day.minutesOfDay(Date()) + 30), reminders: [30])
         let content = UNMutableNotificationContent()
         content.title = sample.title
-        content.body = Nag.body(tone: settings.tone, item: sample, minutesBefore: 30)
+        content.body = Nag.body(settings: settings, item: sample, minutesBefore: 30)
         content.sound = .default
         if settings.voiceEnabled,
-           let name = await voice.soundFile(text: Nag.spoken(tone: settings.tone, item: sample, minutesBefore: 30),
+           let name = await voice.soundFile(text: Nag.spoken(settings: settings, item: sample, minutesBefore: 30),
                                             voiceID: settings.voiceID) {
             content.sound = UNNotificationSound(named: UNNotificationSoundName(name))
         }

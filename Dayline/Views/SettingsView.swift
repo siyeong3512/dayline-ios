@@ -107,16 +107,35 @@ struct SettingsView: View {
     private var toneSection: some View {
         Section {
             Picker("말투", selection: $store.settings.tone) {
-                ForEach(NagTone.allCases) { Text($0.label).tag($0) }
+                ForEach(NagTone.allCases.filter { $0 != .custom || store.settings.customTone != nil }) { t in
+                    Text(t == .custom ? (store.settings.customTone?.name ?? t.label) : t.label).tag(t)
+                }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("미리보기 · 자료구조 30분 전").font(.caption).foregroundStyle(.secondary)
-                Text(Nag.body(tone: store.settings.tone, item: sample, minutesBefore: 30))
-                    .font(.subheadline)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("미리보기").font(.caption).foregroundStyle(.secondary)
+                ForEach([1440, 30, 10], id: \.self) { n in
+                    Text("· \(ReminderOption.label(n)): " + Nag.line(settings: store.settings, item: sample, minutesBefore: n))
+                        .font(.subheadline)
+                }
             }
             .padding(.vertical, 2)
+            if let custom = store.settings.customTone {
+                LabeledContent(custom.name, value: "문장 \(custom.count)개")
+                Button("나만의 말투 지우기", role: .destructive) {
+                    if store.settings.tone == .custom { store.settings.tone = .friend }
+                    store.settings.customTone = nil
+                }
+            }
+            Button {
+                importing = true
+            } label: {
+                Label(store.settings.customTone == nil ? "나만의 말투 가져오기" : "나만의 말투 바꾸기",
+                      systemImage: "text.bubble")
+            }
         } header: {
             Text("잔소리")
+        } footer: {
+            Text("나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 문장은 이 아이폰 안에만 저장돼요.")
         }
     }
 
@@ -134,7 +153,7 @@ struct SettingsView: View {
                 }
                 Button("미리 듣기") {
                     speaker.stopSpeaking(at: .immediate)
-                    let u = AVSpeechUtterance(string: Nag.spoken(tone: store.settings.tone, item: sample, minutesBefore: 30))
+                    let u = AVSpeechUtterance(string: Nag.spoken(settings: store.settings, item: sample, minutesBefore: 30))
                     u.voice = VoiceMaker.voice(for: store.settings.voiceID)
                     speaker.speak(u)
                 }
@@ -194,6 +213,14 @@ struct SettingsView: View {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             do {
                 let data = try Data(contentsOf: url)
+                if let tone = CustomTone.decodeFile(data) {
+                    var s = store.settings
+                    s.customTone = tone
+                    s.tone = .custom
+                    store.settings = s
+                    notice = "‘\(tone.name)’ 말투를 가져왔어요 (문장 \(tone.count)개). 잔소리 말투가 이걸로 바뀌었어요."
+                    return
+                }
                 let r = try store.importData(data)
                 notice = "일정·시간표 \(r.items)개, 할 일 \(r.todos)개를 가져왔어요. 가져오기 전 상태도 자동 백업해뒀어요."
             } catch {
