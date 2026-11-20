@@ -23,6 +23,17 @@ struct SettingsView: View {
     @State private var notice: String?
     @State private var speaker = AVSpeechSynthesizer()
     @State private var photoItem: PhotosPickerItem?
+    @State private var senderDraft = ""
+
+    /// 말투 파일과 상관없이 알림 제목(보낸 사람)을 바꾼다. 비우면 일정 이름이 제목.
+    private func applySender() {
+        guard store.settings.customTone != nil else { return }
+        let name = senderDraft.trimmingCharacters(in: .whitespaces)
+        var s = store.settings
+        s.customTone?.sender = name.isEmpty ? nil : name
+        store.settings = s
+        senderDraft = name
+    }
 
     private let sample = ScheduleItem(id: "sample", kind: .timetable, title: "자료구조", place: "K501",
                                       time: "14:00", weekdays: [1], reminders: [30])
@@ -144,8 +155,18 @@ struct SettingsView: View {
             }
             if let custom = store.settings.customTone {
                 LabeledContent(custom.name, value: "문장 \(custom.count)개")
-                if let sender = custom.sender {
-                    LabeledContent("보낸 사람(알림 제목)", value: sender)
+                LabeledContent("보낸 사람") {
+                    TextField("비우면 일정 이름", text: $senderDraft)
+                        .multilineTextAlignment(.trailing)
+                        .submitLabel(.done)
+                        .onSubmit { applySender() }
+                }
+                .onAppear { senderDraft = custom.sender ?? "" }
+                .onChange(of: custom.name) { _, _ in senderDraft = store.settings.customTone?.sender ?? "" }
+                if (custom.sender ?? "") != senderDraft.trimmingCharacters(in: .whitespaces) {
+                    Button("보낸 사람 이름 적용") { applySender() }
+                }
+                if custom.sender != nil {
                     Toggle(isOn: $store.settings.chatStyle) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("카톡처럼 왼쪽에 사진 (실험)")
