@@ -133,51 +133,58 @@ struct NextUpLockScreen: View {
 
     private var kind: String { state.kindLabel == "시간표" ? "수업" : "약속" }
 
+    // 잠금화면 라이브 액티비티는 높이가 약 160pt로 제한돼서, 세 줄 안에 모두 넣는다.
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 14) {
-                Face(state: state, size: 64)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(state.sender.map { "\($0) · 다음 \(kind)" } ?? "다음 \(kind)")
+        VStack(alignment: .leading, spacing: 10) {
+            // 1줄: 사진 | 제목 / 시간·장소
+            HStack(alignment: .center, spacing: 12) {
+                Face(state: state, size: 56)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(state.title)
+                        .font(.system(size: 19, weight: .bold))
+                        .foregroundStyle(WidgetTheme.text)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text("다음 \(kind) · " + (state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place))
                         .font(.system(size: 13))
                         .foregroundStyle(WidgetTheme.sub)
                         .lineLimit(1)
-                    Text(state.title)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(WidgetTheme.text)
-                        .lineLimit(1)
-                    Text(state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place)
-                        .font(.system(size: 14))
-                        .foregroundStyle(WidgetTheme.sub)
-                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
                 Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: 0) {
-                    if started {
-                        Text("시작했어요").font(.headline).foregroundStyle(WidgetTheme.accent)
-                    } else {
+            }
+
+            // 2줄: 남은 시간 + 진행 바
+            if started {
+                Text("시작했어요")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(WidgetTheme.accent)
+            } else {
+                HStack(alignment: .center, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Countdown(state: state)
-                            .font(.system(size: 28, weight: .heavy, design: .rounded))
+                            .font(.system(size: 22, weight: .heavy, design: .rounded))
                             .foregroundStyle(WidgetTheme.accent)
-                            .frame(maxWidth: 110, alignment: .trailing)
-                        Text("남음").font(.caption2).foregroundStyle(WidgetTheme.sub)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(width: 104, alignment: .leading)
+                        Text("남음").font(.system(size: 12)).foregroundStyle(WidgetTheme.sub)
                     }
+                    .fixedSize()
+                    Bar(state: state)
                 }
             }
-            if !started {
-                Bar(state: state)
-            }
+
+            // 3줄: 보낸 사람 + 잔소리 (최대 2줄)
             if let line = state.line, !started {
-                Text(line)
-                    .font(.system(size: 15))
-                    .foregroundStyle(WidgetTheme.text)
+                (Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 14, weight: .bold)).foregroundColor(WidgetTheme.accent)
+                    + Text(line).font(.system(size: 14)).foregroundColor(WidgetTheme.text))
                     .lineLimit(2)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(WidgetTheme.bubble))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }

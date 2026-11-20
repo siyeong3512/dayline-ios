@@ -26,7 +26,7 @@ enum LiveActivityManager {
 
         var state = makeState(next.item, next.when, settings: settings)
         if let same = current.first(where: { $0.content.state.itemID == state.itemID && $0.content.state.start == state.start }) {
-            state.from = same.content.state.from // 카운트다운이 처음부터 다시 시작하지 않게
+            state.from = min(state.from, same.content.state.from) // 진행 바가 뒤로 가지 않게
             await same.update(ActivityContent(state: state, staleDate: next.when))
             for a in current where a.id != same.id { await a.end(nil, dismissalPolicy: .immediate) }
             return
@@ -57,7 +57,8 @@ enum LiveActivityManager {
             kindLabel: x.kind == .timetable ? "시간표" : "약속",
             timeLabel: timeLabel,
             colorHex: Palette.hex[min(max(x.color, 0), Palette.hex.count - 1)],
-            from: Date(),
+            // 진행 바는 시작 3시간 전부터 차오른다 (그보다 일찍 띄우면 지금부터)
+            from: min(Date(), when.addingTimeInterval(-window)),
             start: when,
             sender: Nag.sender(settings: settings),
             line: line,
