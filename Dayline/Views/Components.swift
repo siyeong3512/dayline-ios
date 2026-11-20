@@ -1,126 +1,163 @@
 import SwiftUI
 
-// MARK: - 화면 공통 틀: 브랜드 · 제목 · 추가 버튼 · UP NEXT
+// MARK: - 화면 틀 (토스 결: 흰 배경, 굵은 제목, 오른쪽 연한 버튼)
 
 struct Screen<Content: View>: View {
     let title: String
-    var addLabel: String?
-    var onAdd: (() -> Void)?
-    var showsNext = true
+    var actionLabel: String?
+    var action: (() -> Void)?
     @ViewBuilder var content: Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Brand()
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center) {
                     Text(title)
-                        .font(.system(size: 32, weight: .bold))
-                    Spacer()
-                    if let onAdd {
-                        Button(action: onAdd) {
-                            Label(addLabel ?? "추가", systemImage: "plus")
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 14)
-                                .frame(height: 36)
-                                .foregroundStyle(Color(.systemBackground))
-                                .background(Capsule().fill(Color.primary))
-                        }
-                        .buttonStyle(.plain)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 12)
+                    if let action {
+                        SoftButton(title: actionLabel ?? "추가", action: action)
                     }
                 }
-                if showsNext { UpNextCard() }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 18)
                 content
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 6)
             .padding(.bottom, 110)
         }
         .scrollIndicators(.hidden)
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(Theme.bg.ignoresSafeArea())
     }
 }
 
-struct Brand: View {
+/// 섹션 사이 두꺼운 회색 띠
+struct Band: View {
     var body: some View {
-        (Text("dayline").foregroundColor(.primary) + Text(".").foregroundColor(Palette.color(0)))
-            .font(.system(size: 17, weight: .heavy, design: .rounded))
+        Rectangle().fill(Theme.band).frame(height: 12)
     }
 }
 
-struct Card<Content: View>: View {
-    var padding: CGFloat = 16
-    @ViewBuilder var content: Content
-    var body: some View {
-        content
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground)))
-    }
-}
-
-struct Eyebrow: View {
-    let text: String
-    var body: some View {
-        Text(text)
-            .font(.caption2.weight(.bold))
-            .tracking(1.2)
-            .foregroundStyle(.secondary)
-    }
-}
-
-// MARK: - UP NEXT
-
-struct UpNextCard: View {
-    @EnvironmentObject var store: Store
+struct SectionHeader: View {
+    let title: String
+    var trailing: String?
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            Card {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Eyebrow(text: "UP NEXT")
-                        if let next = store.upNext(now: context.date) {
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text(next.item.title).font(.headline)
-                                Text(Self.countdown(from: context.date, to: next.when))
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 8).padding(.vertical, 3)
-                                    .background(Capsule().fill(Palette.color(next.item.color).opacity(0.18)))
-                                    .foregroundStyle(Palette.color(next.item.color))
-                            }
-                            Text(Self.detail(next.item, next.when))
-                                .font(.footnote).foregroundStyle(.secondary)
-                        } else {
-                            Text("다음 일정을 위한 여유.").font(.headline)
-                            Text("다가오는 일정이 없어요.").font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: "clock")
-                        .font(.title2)
-                        .foregroundStyle(.tertiary)
-                }
+        HStack(alignment: .center) {
+            Text(title).font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+            Spacer()
+            if let trailing {
+                Text(trailing).font(.system(size: 15)).foregroundStyle(Theme.sub)
             }
         }
     }
+}
 
-    static func countdown(from now: Date, to when: Date) -> String {
-        let m = Int((when.timeIntervalSince(now) / 60).rounded(.up))
-        if m < 60 { return "\(max(m, 0))분 후" }
-        if m < 1440 { return "\(m / 60)시간 \(m % 60)분 후" }
-        return "\(m / 1440)일 후"
-    }
+/// 연보라 바탕 + 진한 보라 글씨 버튼 ("자세히", "수업 추가")
+struct SoftButton: View {
+    let title: String
+    let action: () -> Void
 
-    static func detail(_ x: ScheduleItem, _ when: Date) -> String {
-        var s = (x.kind == .timetable ? "시간표" : "약속") + " · " + Day.format(when, "MMMdEEE") + " " + x.time
-        if !x.place.isEmpty { s += " · " + x.place }
-        return s
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.accentStrong)
+                .padding(.horizontal, 14)
+                .frame(height: 36)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.accentSoft))
+        }
+        .buttonStyle(PressStyle())
     }
 }
 
-// MARK: - 하단 탭바 (반투명 + 물방울처럼 옮겨가는 선택 표시)
+/// 눌렀을 때 살짝 작아지는 토스식 반응
+struct PressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// 목록 앞 동그란 아이콘
+struct IconBadge: View {
+    var text: String?
+    var systemImage: String?
+    let bg: Color
+    let fg: Color
+    var size: CGFloat = 40
+
+    var body: some View {
+        ZStack {
+            Circle().fill(bg)
+            if let systemImage {
+                Image(systemName: systemImage).font(.system(size: size * 0.42, weight: .semibold))
+            } else if let text {
+                Text(text)
+                    .font(.system(size: text.count > 2 ? 12 : 14, weight: .heavy))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .padding(.horizontal, 3)
+            }
+        }
+        .foregroundStyle(fg)
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// 토스 목록 한 줄: 아이콘 · (회색 설명 / 굵은 제목) · 오른쪽
+struct ListRow<Trailing: View>: View {
+    let badge: IconBadge
+    let meta: String
+    let title: String
+    var titleColor: Color = Theme.text
+    var strike = false
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 14) {
+            badge
+            VStack(alignment: .leading, spacing: 2) {
+                Text(meta).font(.system(size: 13)).foregroundStyle(Theme.faint).lineLimit(1)
+                Text(title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(titleColor)
+                    .strikethrough(strike, color: Theme.faint)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            trailing
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
+}
+
+struct Chevron: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.tabIdle)
+    }
+}
+
+struct EmptyNote: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.system(size: 15))
+            .foregroundStyle(Theme.faint)
+            .padding(.vertical, 14)
+    }
+}
+
+// MARK: - 하단 탭바 (토스 결: 흰 바, 위쪽만 둥글게, 선택한 탭만 진하게)
 
 enum Tab: String, CaseIterable, Identifiable {
     case home, timetable, calendar, settings
@@ -136,7 +173,7 @@ enum Tab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .home: return "house.fill"
-        case .timetable: return "square.grid.3x3.fill"
+        case .timetable: return "tablecells.fill"
         case .calendar: return "calendar"
         case .settings: return "gearshape.fill"
         }
@@ -146,50 +183,41 @@ enum Tab: String, CaseIterable, Identifiable {
 struct TabBar: View {
     let selected: Tab
     let onSelect: (Tab) -> Void
-    @Namespace private var ns
-    @State private var squash = false
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             ForEach(Tab.allCases) { t in
+                let on = selected == t
                 Button {
-                    guard t != selected else { return }
-                    onSelect(t)
-                    squash = true
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.5).delay(0.12)) { squash = false }
+                    if !on { onSelect(t) }
                 } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: t.icon).font(.system(size: 17, weight: .semibold))
-                        Text(t.label).font(.system(size: 10, weight: .semibold))
+                    VStack(spacing: 4) {
+                        Image(systemName: t.icon).font(.system(size: 21, weight: .semibold))
+                        Text(t.label).font(.system(size: 11, weight: on ? .bold : .medium))
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .foregroundStyle(selected == t ? Color.primary : Color.secondary)
-                    .background {
-                        if selected == t {
-                            Capsule()
-                                .fill(Color.primary.opacity(0.1))
-                                .scaleEffect(x: squash ? 1.18 : 1, y: squash ? 0.86 : 1)
-                                .matchedGeometryEffect(id: "droplet", in: ns)
-                        }
-                    }
+                    .frame(height: 52)
+                    .foregroundStyle(on ? Theme.text : Theme.tabIdle)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(t.label)
-                .accessibilityAddTraits(selected == t ? .isSelected : [])
+                .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
-        .padding(5)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.14), radius: 20, y: 8)
-        .padding(.horizontal, 22)
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+        .background(
+            UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous)
+                .fill(Theme.tabBar)
+                .shadow(color: Color.black.opacity(0.07), radius: 12, y: -2)
+                .ignoresSafeArea(edges: .bottom)
+        )
         .sensoryFeedback(.selection, trigger: selected)
     }
 }
 
-// MARK: - 편집기에서 쓰는 선택 칩
+// MARK: - 편집 화면 선택 칩
 
 struct WeekdayPicker: View {
     @Binding var selection: [Int]
@@ -201,10 +229,10 @@ struct WeekdayPicker: View {
                     if on { selection.removeAll { $0 == d } } else { selection.append(d); selection.sort() }
                 } label: {
                     Text(Day.names[d])
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .foregroundStyle(on ? Color(.systemBackground) : Color.primary)
-                        .background(Circle().fill(on ? Color.primary : Color.primary.opacity(0.07)))
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .foregroundStyle(on ? Color.white : Theme.pillText)
+                        .background(Circle().fill(on ? Theme.accent : Theme.pill))
                 }
                 .buttonStyle(.plain)
             }
@@ -224,10 +252,10 @@ struct ReminderChips: View {
                     if on { selection.removeAll { $0 == n } } else { selection.append(n); selection.sort() }
                 } label: {
                     Text(ReminderOption.label(n))
-                        .font(.footnote.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 34)
-                        .foregroundStyle(on ? Color(.systemBackground) : Color.primary)
-                        .background(Capsule().fill(on ? Color.primary : Color.primary.opacity(0.07)))
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .foregroundStyle(on ? Color.white : Theme.pillText)
+                        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(on ? Theme.accent : Theme.pill))
                 }
                 .buttonStyle(.plain)
             }
@@ -251,7 +279,7 @@ struct ColorGrid: View {
                                 Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(.white)
                             }
                         }
-                        .overlay(Circle().strokeBorder(Color.primary.opacity(selection == i ? 0.5 : 0), lineWidth: 2).padding(-3))
+                        .overlay(Circle().strokeBorder(Theme.text.opacity(selection == i ? 0.35 : 0), lineWidth: 2).padding(-3))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Palette.names[i])

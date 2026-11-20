@@ -3,89 +3,79 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var store: Store
     @Binding var sheet: EditorSheet?
-    @State private var filter: Cadence?
-    @State private var filterIndicator: Cadence?
-    @Namespace private var ns
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
+        TimelineView(.periodic(from: .now, by: 30)) { context in
             let key = Day.key(context.date)
-            Screen(title: "오늘의 할 일", addLabel: "할 일",
-                   onAdd: { sheet = .todo(TodoItem(cadence: filter ?? .daily), isNew: true) }) {
-                overview(key)
-                filterBar
-                list(key)
-                Text("Daily는 매일, Weekly는 월요일, Monthly는 매월 1일에 새 체크리스트로 시작해요.")
-                    .font(.footnote).foregroundStyle(.secondary)
+            Screen(title: Day.format(context.date, "MMMMdEEEE"), actionLabel: "할 일 추가",
+                   action: { sheet = .todo(TodoItem(cadence: .daily), isNew: true) }) {
+                nextUp(context.date)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+                Band()
+                todoSection(key)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 22)
+                Band()
+                todaySection(key, now: context.date)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 22)
             }
         }
     }
 
-    private func overview(_ key: String) -> some View {
-        let active = store.todos.filter { !$0.archived }
-        let done = active.filter { $0.isDone(on: key) }.count
-        let value = active.isEmpty ? 0 : Double(done) / Double(active.count)
-        return Card {
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Eyebrow(text: "TODAY’S FOCUS")
-                    Text(Day.format(Day.date(key), "MMMMdEEEE")).font(.title3.bold())
-                    Text(active.isEmpty ? "작은 할 일부터 하나씩 시작해요." : "\(active.count)개 중 \(done)개 완료")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
-                }
-                Spacer()
-                ProgressRing(value: value)
-            }
-        }
-    }
-
-    private var filterBar: some View {
-        let options: [Cadence?] = [nil, .daily, .weekly, .monthly]
-        return HStack(spacing: 0) {
-            ForEach(options, id: \.self) { c in
-                Button {
-                    filter = c
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { filterIndicator = c }
-                } label: {
-                    Text(c?.label ?? "전체")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .foregroundStyle(filterIndicator == c ? Color.primary : Color.secondary)
-                        .background {
-                            if filterIndicator == c {
-                                Capsule().fill(Color(.secondarySystemGroupedBackground))
-                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
-                                    .matchedGeometryEffect(id: "filter", in: ns)
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(Capsule().fill(Color.primary.opacity(0.06)))
-    }
+    // MARK: 다음 일정
 
     @ViewBuilder
-    private func list(_ key: String) -> some View {
-        let tasks = store.activeTodos(filter: filter, on: key)
-        if tasks.isEmpty {
-            Card {
-                VStack(spacing: 10) {
-                    Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(.tertiary)
-                    Text(store.todos.contains(where: { !$0.archived }) ? "이 주기의 할 일이 없어요" : "오늘의 작은 시작")
-                        .font(.headline)
-                    Text("할 일을 적고, 하나씩 체크해보세요.").font(.footnote).foregroundStyle(.secondary)
-                    Button("할 일 추가하기") { sheet = .todo(TodoItem(cadence: filter ?? .daily), isNew: true) }
-                        .font(.subheadline.weight(.semibold))
+    private func nextUp(_ now: Date) -> some View {
+        if let next = store.upNext(now: now) {
+            HStack(spacing: 14) {
+                IconBadge(systemImage: "clock.fill", bg: Theme.accentSoft, fg: Theme.accent, size: 48)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(TimeText.until(next.when, from: now) + (next.item.place.isEmpty ? "" : " · " + next.item.place))
+                        .font(.system(size: 14)).foregroundStyle(Theme.sub)
+                    Text(next.item.title)
+                        .font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+                        .lineLimit(1)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                SoftButton(title: "자세히") { sheet = .schedule(next.item, isNew: false) }
             }
         } else {
-            VStack(spacing: 8) {
+            HStack(spacing: 14) {
+                IconBadge(systemImage: "sun.max.fill", bg: Theme.pill, fg: Theme.faint, size: 48)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("다가오는 일정").font(.system(size: 14)).foregroundStyle(Theme.sub)
+                    Text("여유로운 하루예요").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+                }
+            }
+        }
+    }
+
+    // MARK: 할 일
+
+    private func todoSection(_ key: String) -> some View {
+        let active = store.todos.filter { !$0.archived }
+        let done = active.filter { $0.isDone(on: key) }.count
+        let tasks = store.activeTodos(filter: nil, on: key)
+        let progress = active.isEmpty ? 0 : CGFloat(done) / CGFloat(active.count)
+        return VStack(alignment: .leading, spacing: 4) {
+            SectionHeader(title: "오늘의 할 일", trailing: active.isEmpty ? nil : "\(active.count)개 중 \(done)개")
+            if !active.isEmpty {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.pill)
+                        Capsule().fill(Theme.accent).frame(width: max(geo.size.width * progress, progress > 0 ? 6 : 0))
+                    }
+                }
+                .frame(height: 6)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+                .animation(.easeOut(duration: 0.45), value: progress)
+            }
+            if tasks.isEmpty {
+                EmptyNote(text: "할 일을 추가하고 하나씩 체크해 보세요")
+            } else {
                 ForEach(tasks) { task in
                     TodoRow(task: task, dayKey: key,
                             onToggle: { withAnimation(.snappy) { store.toggle(task, on: key) } },
@@ -94,28 +84,30 @@ struct HomeView: View {
             }
         }
     }
-}
 
-struct ProgressRing: View {
-    let value: Double
+    // MARK: 오늘 일정 (수업 + 약속)
 
-    var body: some View {
-        ZStack {
-            Circle().stroke(Color.primary.opacity(0.09), lineWidth: 8)
-            Circle()
-                .trim(from: 0, to: max(value, 0.0001))
-                .stroke(Color.primary, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .opacity(value > 0 ? 1 : 0)
-            Text("\(Int((value * 100).rounded()))%")
-                .font(.system(.subheadline, design: .rounded).weight(.bold).monospacedDigit())
-                .contentTransition(.numericText(value: value))
+    private func todaySection(_ key: String, now: Date) -> some View {
+        let list = (store.events(on: key, kind: .timetable) + store.events(on: key, kind: .event))
+            .sorted { $0.time < $1.time }
+        return VStack(alignment: .leading, spacing: 4) {
+            SectionHeader(title: "오늘 일정", trailing: list.isEmpty ? nil : "\(list.count)개")
+            if list.isEmpty {
+                EmptyNote(text: "오늘은 일정이 없어요")
+            } else {
+                ForEach(list) { x in
+                    Button { sheet = .schedule(x, isNew: false) } label: {
+                        ListRow(badge: IconBadge(text: TimeText.short(x.time), bg: Palette.soft(x.color), fg: Palette.strong(x.color)),
+                                meta: (x.kind == .timetable ? "수업 · " : "약속 · ") + TimeText.ampm(x.time) + (x.place.isEmpty ? "" : " · " + x.place),
+                                title: x.title,
+                                titleColor: Day.at(key, x.time) < now ? Theme.faint : Theme.text) {
+                            Chevron()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
-        .frame(width: 74, height: 74)
-        .animation(.easeOut(duration: 0.52), value: value)
-        .accessibilityElement()
-        .accessibilityLabel("할 일 완료율")
-        .accessibilityValue("\(Int((value * 100).rounded()))퍼센트")
     }
 }
 
@@ -127,66 +119,66 @@ struct TodoRow: View {
 
     var body: some View {
         let done = task.isDone(on: dayKey)
-        HStack(spacing: 12) {
-            Button(action: onToggle) {
-                ZStack {
-                    Circle()
-                        .strokeBorder(done ? Color.primary : Color.secondary.opacity(0.5), lineWidth: 2)
-                        .background(Circle().fill(done ? Color.primary : Color.clear))
-                    if done {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .heavy))
-                            .foregroundStyle(Color(.systemBackground))
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                }
-                .frame(width: 26, height: 26)
-                .contentShape(Rectangle())
+        HStack(spacing: 14) {
+            Button(action: onEdit) {
+                ListRow(badge: IconBadge(text: badgeText,
+                                         bg: done ? Theme.pill : badgeBg,
+                                         fg: done ? Theme.tabIdle : badgeFg),
+                        meta: meta,
+                        title: task.title,
+                        titleColor: done ? Theme.faint : Theme.text,
+                        strike: done) { EmptyView() }
             }
             .buttonStyle(.plain)
+
+            Button(action: onToggle) {
+                Text(done ? "완료" : "체크")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(done ? Color.white : Theme.pillText)
+                    .padding(.horizontal, 13)
+                    .frame(height: 34)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(done ? Theme.accent : Theme.pill))
+            }
+            .buttonStyle(PressStyle())
             .sensoryFeedback(.success, trigger: done) { _, new in new }
             .accessibilityLabel("\(task.title) 완료")
             .accessibilityAddTraits(done ? .isSelected : [])
-
-            Button(action: onEdit) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(task.title)
-                        .font(.body.weight(.medium))
-                        .strikethrough(done, color: .secondary)
-                        .foregroundStyle(done ? Color.secondary : Color.primary)
-                        .multilineTextAlignment(.leading)
-                    HStack(spacing: 6) {
-                        Text(task.cadence.label)
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 7).padding(.vertical, 2)
-                            .background(Capsule().fill(task.cadence.tint.opacity(0.16)))
-                            .foregroundStyle(task.cadence.tint)
-                        if let label = dueLabel {
-                            Text(label.text)
-                                .font(.caption)
-                                .foregroundStyle(label.overdue ? Color.red : Color.secondary)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Image(systemName: "ellipsis").foregroundStyle(.tertiary)
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(Color(.secondarySystemGroupedBackground)))
-        .opacity(done ? 0.75 : 1)
     }
 
-    private var dueLabel: (text: String, overdue: Bool)? {
-        guard let due = task.dueKey(on: dayKey) else { return nil }
-        let delta = Day.cal.dateComponents([.day], from: Day.date(dayKey), to: Day.date(due)).day ?? 0
-        if delta < 0 { return ("기한 지남", true) }
-        if delta == 0 { return ("오늘 마감", false) }
-        if delta == 1 { return ("내일 마감", false) }
-        return (Day.format(Day.date(due), "Md") + " 마감", false)
+    private var badgeText: String {
+        switch task.cadence {
+        case .daily: return "D"
+        case .weekly: return "W"
+        case .monthly: return "M"
+        }
+    }
+
+    private var badgeBg: Color {
+        switch task.cadence {
+        case .daily: return Theme.accentSoft
+        case .weekly: return Palette.soft(3)
+        case .monthly: return Palette.soft(2)
+        }
+    }
+
+    private var badgeFg: Color {
+        switch task.cadence {
+        case .daily: return Theme.accentStrong
+        case .weekly: return Palette.strong(3)
+        case .monthly: return Palette.strong(2)
+        }
+    }
+
+    private var meta: String {
+        var s = task.cadence.korean
+        if let due = task.dueKey(on: dayKey) {
+            let delta = Day.cal.dateComponents([.day], from: Day.date(dayKey), to: Day.date(due)).day ?? 0
+            if delta < 0 { s += " · 기한 지남" }
+            else if delta == 0 { s += " · 오늘 마감" }
+            else if delta == 1 { s += " · 내일 마감" }
+            else { s += " · " + Day.format(Day.date(due), "MdE") + " 마감" }
+        }
+        return s
     }
 }

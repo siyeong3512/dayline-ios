@@ -5,7 +5,7 @@ enum CalMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// 약속(시작 시간만 있는 일정) 캘린더. 날짜 줄과 틀은 그대로 두고, 아래 일정 페이지만 옆으로 넘어간다.
+/// 약속 캘린더. 날짜 줄과 틀은 그대로 두고, 아래 일정 페이지만 옆으로 넘어간다.
 struct CalendarScreen: View {
     @EnvironmentObject var store: Store
     @Binding var sheet: EditorSheet?
@@ -17,12 +17,16 @@ struct CalendarScreen: View {
     @Namespace private var ns
 
     var body: some View {
-        Screen(title: "내 일정", addLabel: "약속",
-               onAdd: { sheet = .schedule(ScheduleItem(kind: .event, date: selected, time: "12:00",
-                                                        color: 0, reminders: [60]), isNew: true) }) {
-            header
-            modePicker
-            if mode == .month { monthGrid } else { dateStrip }
+        Screen(title: Day.format(Day.date(selected), "MMMM") + " 일정", actionLabel: "약속 추가",
+               action: { sheet = .schedule(ScheduleItem(kind: .event, date: selected, time: "12:00", reminders: [60]), isNew: true) }) {
+            VStack(alignment: .leading, spacing: 18) {
+                controls
+                modePicker
+                if mode == .month { monthGrid } else { dateStrip }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 22)
+            Band()
             ZStack(alignment: .topLeading) {
                 page
                     .id(pageKey)
@@ -43,73 +47,88 @@ struct CalendarScreen: View {
 
     // MARK: 머리글
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Text(Day.format(Day.date(selected), "yMMMM")).font(.title3.bold())
+    private var controls: some View {
+        HStack(spacing: 6) {
+            Text(Day.format(Day.date(selected), "y년"))
+                .font(.system(size: 15)).foregroundStyle(Theme.sub)
             Spacer()
-            Button { move(-1) } label: { Image(systemName: "chevron.left") }
-                .accessibilityLabel("이전 기간")
-            Button { move(1) } label: { Image(systemName: "chevron.right") }
-                .accessibilityLabel("다음 기간")
-            Button("오늘") { select(Day.today) }
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Capsule().fill(Color.primary.opacity(0.07)))
+            Button { move(-1) } label: {
+                Image(systemName: "chevron.left").frame(width: 36, height: 36)
+            }
+            .accessibilityLabel("이전 기간")
+            Button { move(1) } label: {
+                Image(systemName: "chevron.right").frame(width: 36, height: 36)
+            }
+            .accessibilityLabel("다음 기간")
+            Button { select(Day.today) } label: {
+                Text("오늘")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.pillText)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.pill))
+            }
         }
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(Theme.sub)
         .buttonStyle(.plain)
-        .font(.headline)
     }
 
     private var modePicker: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 4) {
             ForEach(CalMode.allCases) { m in
+                let on = modeIndicator == m
                 Button {
                     mode = m
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { modeIndicator = m }
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) { modeIndicator = m }
                 } label: {
                     Text(m.rawValue)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.system(size: 15, weight: on ? .bold : .medium))
+                        .foregroundStyle(on ? Theme.text : Theme.sub)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .foregroundStyle(modeIndicator == m ? Color.primary : Color.secondary)
+                        .frame(height: 36)
                         .background {
-                            if modeIndicator == m {
-                                Capsule().fill(Color(.secondarySystemGroupedBackground))
-                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+                            if on {
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .fill(Theme.bg)
+                                    .shadow(color: Color.black.opacity(0.06), radius: 3, y: 1)
                                     .matchedGeometryEffect(id: "mode", in: ns)
                             }
                         }
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
-        .background(Capsule().fill(Color.primary.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.band))
     }
 
     // MARK: 날짜 줄 / 월간 격자
 
     private var dateStrip: some View {
         let today = Day.today
-        return HStack(spacing: 6) {
+        return HStack(spacing: 2) {
             ForEach(Day.week(selected), id: \.self) { d in
                 let key = Day.key(d)
-                let isSelected = key == selected
+                let on = key == selected
+                let has = !store.events(on: key).isEmpty
                 Button { select(key) } label: {
-                    VStack(spacing: 4) {
-                        Text(Day.names[Day.weekday(d)]).font(.caption2.weight(.semibold))
-                        Text("\(Day.cal.component(.day, from: d))").font(.headline)
+                    VStack(spacing: 6) {
+                        Text(Day.names[Day.weekday(d)])
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(on || key == today ? Theme.accent : Theme.faint)
+                        Text("\(Day.cal.component(.day, from: d))")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(on ? Color.white : (key == today ? Theme.accent : Theme.text))
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(on ? Theme.accent : Color.clear))
                         Circle()
-                            .fill(store.events(on: key).isEmpty ? Color.clear
-                                  : (isSelected ? Color(.systemBackground) : Palette.color(0)))
-                            .frame(width: 5, height: 5)
+                            .fill(has && !on ? Theme.tabIdle : Color.clear)
+                            .frame(width: 4, height: 4)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .foregroundStyle(isSelected ? Color(.systemBackground)
-                                     : (key == today ? Palette.color(0) : Color.primary))
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isSelected ? Color.primary : Color(.secondarySystemGroupedBackground)))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Day.format(d, "MMMMdEEEE"))
@@ -120,45 +139,39 @@ struct CalendarScreen: View {
     private var monthGrid: some View {
         let base = Day.date(selected)
         let today = Day.today
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
-        return Card(padding: 10) {
-            VStack(spacing: 6) {
-                HStack(spacing: 4) {
-                    ForEach(Day.mondayFirst, id: \.self) { n in
-                        Text(Day.names[n]).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                    }
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
+        return VStack(spacing: 6) {
+            HStack(spacing: 2) {
+                ForEach(Day.mondayFirst, id: \.self) { n in
+                    Text(Day.names[n]).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.faint)
+                        .frame(maxWidth: .infinity)
                 }
-                LazyVGrid(columns: columns, spacing: 4) {
-                    ForEach(Day.monthCells(selected), id: \.self) { d in
-                        let key = Day.key(d)
-                        let list = store.events(on: key)
-                        let isSelected = key == selected
-                        Button { select(key) } label: {
-                            VStack(spacing: 3) {
-                                Text("\(Day.cal.component(.day, from: d))")
-                                    .font(.subheadline.weight(key == today ? .heavy : .medium))
-                                    .foregroundStyle(isSelected ? Color(.systemBackground)
-                                                     : key == today ? Palette.color(0) : Color.primary)
-                                HStack(spacing: 2) {
-                                    ForEach(list.prefix(3)) { x in
-                                        Circle().fill(Palette.color(x.color)).frame(width: 4, height: 4)
-                                    }
+            }
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(Day.monthCells(selected), id: \.self) { d in
+                    let key = Day.key(d)
+                    let list = store.events(on: key)
+                    let on = key == selected
+                    Button { select(key) } label: {
+                        VStack(spacing: 3) {
+                            Text("\(Day.cal.component(.day, from: d))")
+                                .font(.system(size: 15, weight: key == today || on ? .bold : .medium))
+                                .foregroundStyle(on ? Color.white : (key == today ? Theme.accent : Theme.text))
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(on ? Theme.accent : Color.clear))
+                            HStack(spacing: 2) {
+                                ForEach(list.prefix(3)) { x in
+                                    Circle().fill(Palette.color(x.color)).frame(width: 4, height: 4)
                                 }
-                                .frame(height: 4)
-                                Text(list.first?.title ?? " ")
-                                    .font(.system(size: 8))
-                                    .lineLimit(1)
-                                    .foregroundStyle(isSelected ? Color(.systemBackground) : Color.secondary)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 50)
-                            .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(isSelected ? Color.primary : Color.clear))
-                            .opacity(Day.sameMonth(d, base) ? 1 : 0.35)
+                            .frame(height: 4)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(Day.format(d, "MMMMd")), 일정 \(list.count)개")
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .opacity(Day.sameMonth(d, base) ? 1 : 0.3)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(Day.format(d, "MMMMd")), 약속 \(list.count)개")
                 }
             }
         }
@@ -170,46 +183,32 @@ struct CalendarScreen: View {
         let isWeek = mode == .week
         let days = Day.week(selected)
         let count = isWeek ? days.reduce(0) { $0 + store.events(on: Day.key($1)).count } : store.events(on: selected).count
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(isWeek ? "이번 주 약속" : Day.format(Day.date(selected), "MMMMdEEEE")).font(.title3.bold())
-                Spacer()
-                Text("\(count)개의 일정").font(.footnote).foregroundStyle(.secondary)
-            }
+        return VStack(alignment: .leading, spacing: 4) {
+            SectionHeader(title: isWeek ? "이번 주 약속" : Day.format(Day.date(selected), "dEEEE"),
+                          trailing: count == 0 ? nil : "\(count)개")
             if isWeek {
                 ForEach(days, id: \.self) { d in
                     let key = Day.key(d)
                     let list = store.events(on: key)
-                    Text(Day.format(d, "MMMMdEEEE")).font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary).padding(.top, 4)
-                    if list.isEmpty {
-                        Text("등록된 약속이 없어요.").font(.footnote).foregroundStyle(.tertiary)
-                    } else {
+                    if !list.isEmpty {
+                        Text(Day.format(d, "MMMMdEEEE"))
+                            .font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.faint)
+                            .padding(.top, 10)
                         ForEach(list) { x in EventRow(item: x) { sheet = .schedule(x, isNew: false) } }
                     }
                 }
+                if count == 0 { EmptyNote(text: "이번 주는 약속이 없어요") }
             } else {
                 let list = store.events(on: selected)
                 if list.isEmpty {
-                    Card {
-                        VStack(spacing: 8) {
-                            Image(systemName: "sun.haze").font(.largeTitle).foregroundStyle(.tertiary)
-                            Text("여유로운 하루예요").font(.headline)
-                            Text("고정 일정은 시간표에서 볼 수 있어요.").font(.footnote).foregroundStyle(.secondary)
-                            Button("약속 추가하기") {
-                                sheet = .schedule(ScheduleItem(kind: .event, date: selected, time: "12:00",
-                                                               reminders: [60]), isNew: true)
-                            }
-                            .font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                    }
+                    EmptyNote(text: "약속이 없어요. 고정 수업은 시간표 탭에서 볼 수 있어요")
                 } else {
                     ForEach(list) { x in EventRow(item: x) { sheet = .schedule(x, isNew: false) } }
                 }
             }
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 22)
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
@@ -223,8 +222,7 @@ struct CalendarScreen: View {
             }
             .onEnded { v in
                 let dx = v.translation.width, dy = v.translation.height
-                let isSwipe = abs(dx) >= 50 && abs(dx) > abs(dy) * 1.5
-                if isSwipe {
+                if abs(dx) >= 50 && abs(dx) > abs(dy) * 1.5 {
                     drag = 0
                     move(dx < 0 ? 1 : -1)
                 } else {
@@ -246,7 +244,6 @@ struct CalendarScreen: View {
 
     private func select(_ key: String) {
         guard key != selected else { return }
-        // 방향을 먼저 반영한 뒤 페이지를 바꿔야 나가는 페이지도 올바른 쪽으로 빠진다
         direction = key > selected ? 1 : -1
         DispatchQueue.main.async {
             withAnimation(.spring(response: 0.36, dampingFraction: 0.92)) { selected = key }
@@ -260,29 +257,19 @@ struct EventRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(alignment: .top, spacing: 12) {
-                Text(item.time)
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 46, alignment: .leading)
-                    .padding(.top, 14)
-                HStack(spacing: 0) {
-                    RoundedRectangle(cornerRadius: 2).fill(Palette.color(item.color)).frame(width: 4)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title).font(.headline).foregroundStyle(Color.primary)
-                        Text(item.detailLine).font(.footnote).foregroundStyle(.secondary)
-                        Text(item.reminders.isEmpty ? "알림 없음"
-                             : "🔔 " + item.reminders.map(ReminderOption.label).joined(separator: " · "))
-                            .font(.caption).foregroundStyle(.tertiary)
-                    }
-                    .padding(12)
-                    Spacer(minLength: 0)
-                }
-                .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Palette.color(item.color).opacity(0.1)))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            ListRow(badge: IconBadge(text: TimeText.short(item.time), bg: Palette.soft(item.color), fg: Palette.strong(item.color)),
+                    meta: meta,
+                    title: item.title) {
+                Chevron()
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var meta: String {
+        var s = TimeText.ampm(item.time)
+        if !item.place.isEmpty { s += " · " + item.place }
+        if let first = item.reminders.first { s += " · " + ReminderOption.label(first) + " 알림" }
+        return s
     }
 }

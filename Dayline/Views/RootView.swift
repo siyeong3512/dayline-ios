@@ -34,10 +34,10 @@ struct RootView: View {
 
             TabBar(selected: barTab) { t in
                 tab = t
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) { barTab = t }
+                withAnimation(.easeOut(duration: 0.15)) { barTab = t }
             }
-            .padding(.bottom, 2)
         }
+        .tint(Theme.accent)
         .sheet(item: $sheet) { s in
             switch s {
             case .schedule(let item, let isNew):

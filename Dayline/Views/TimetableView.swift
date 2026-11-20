@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// 에브리타임식 고정 시간표: 요일 × 시간 격자. 빈 칸을 누르면 그 시간으로 수업 추가.
+/// 고정 시간표: 요일 × 시간 격자. 빈 칸을 누르면 그 시간으로 수업 추가.
 struct TimetableView: View {
     @EnvironmentObject var store: Store
     @Binding var sheet: EditorSheet?
 
-    private let unit: CGFloat = 56
-    private let gutter: CGFloat = 26
+    private let unit: CGFloat = 50
+    private let gutter: CGFloat = 24
 
     struct Segment: Identifiable {
         let item: ScheduleItem
@@ -24,15 +24,23 @@ struct TimetableView: View {
         let weekend = segs.contains { $0.day == 0 || $0.day == 6 }
         let days = weekend ? Day.mondayFirst : [1, 2, 3, 4, 5]
         let from = min(9, segs.map { $0.from / 60 }.min() ?? 9)
-        let to = max(20, segs.map { Int((Double($0.to) / 60).rounded(.up)) }.max() ?? 20)
+        let to = max(19, segs.map { Int((Double($0.to) / 60).rounded(.up)) }.max() ?? 19)
 
-        Screen(title: "내 시간표", addLabel: "수업",
-               onAdd: { sheet = .schedule(newClass(day: Day.weekday(Date()), minutes: 9 * 60), isNew: true) }) {
-            grid(days: days, from: from, hours: to - from, segs: segs)
-            Text(store.timetable.isEmpty
-                 ? "빈 시간을 누르거나 수업 추가로 시간표를 채워보세요."
-                 : "고정 일정 \(store.timetable.count)개 · 블록을 누르면 수정할 수 있어요.")
-                .font(.footnote).foregroundStyle(.secondary)
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            Screen(title: "시간표", actionLabel: "수업 추가",
+                   action: { sheet = .schedule(newClass(day: Day.weekday(Date()), minutes: 9 * 60), isNew: true) }) {
+                grid(days: days, from: from, hours: to - from, segs: segs)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                Text(store.timetable.isEmpty ? "빈칸을 누르면 그 시간에 수업을 추가해요" : "블록을 누르면 수정할 수 있어요")
+                    .font(.system(size: 13)).foregroundStyle(Theme.faint)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+                Band()
+                todayClasses(now: context.date)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 22)
+            }
         }
     }
 
@@ -41,27 +49,60 @@ struct TimetableView: View {
                      weekdays: [day], color: store.timetable.count % Palette.colors.count)
     }
 
+    // MARK: 오늘 수업 목록
+
+    private func todayClasses(now: Date) -> some View {
+        let key = Day.key(now)
+        let list = store.events(on: key, kind: .timetable)
+        return VStack(alignment: .leading, spacing: 4) {
+            SectionHeader(title: "오늘 \(Day.names[Day.weekday(now)])요일 수업", trailing: list.isEmpty ? nil : "\(list.count)개")
+            if list.isEmpty {
+                EmptyNote(text: "오늘은 수업이 없어요")
+            } else {
+                ForEach(list) { x in
+                    let start = Day.at(key, x.time)
+                    let end = start.addingTimeInterval(TimeInterval(x.duration * 60))
+                    Button { sheet = .schedule(x, isNew: false) } label: {
+                        ListRow(badge: IconBadge(text: TimeText.short(x.time), bg: Palette.soft(x.color), fg: Palette.strong(x.color)),
+                                meta: x.detailLine,
+                                title: x.title,
+                                titleColor: end < now ? Theme.faint : Theme.text) {
+                            if start > now {
+                                Text(TimeText.until(start, from: now))
+                                    .font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
+                            } else if end > now {
+                                Text("수업 중").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
+                            } else {
+                                Text("끝").font(.system(size: 14)).foregroundStyle(Theme.faint)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: 격자
+
     private func grid(days: [Int], from: Int, hours: Int, segs: [Segment]) -> some View {
         let todayWeekday = Day.weekday(Date())
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
-                Color.clear.frame(width: gutter, height: 32)
+                Color.clear.frame(width: gutter, height: 30)
                 ForEach(days, id: \.self) { d in
                     Text(Day.names[d])
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(d == todayWeekday ? Color.primary : Color.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 32)
-                        .background(d == todayWeekday ? Color.primary.opacity(0.05) : Color.clear)
+                        .font(.system(size: 13, weight: d == todayWeekday ? .heavy : .medium))
+                        .foregroundStyle(d == todayWeekday ? Theme.accent : Theme.faint)
+                        .frame(maxWidth: .infinity, minHeight: 30)
                 }
             }
-            Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 0.5)
             HStack(alignment: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     ForEach(0..<hours, id: \.self) { i in
                         Text("\(from + i)")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 3)
+                            .foregroundStyle(Theme.faint)
                             .padding(.trailing, 5)
                             .frame(width: gutter, height: unit, alignment: .topTrailing)
                     }
@@ -71,8 +112,6 @@ struct TimetableView: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color(.secondarySystemGroupedBackground)))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func column(day: Int, from: Int, hours: Int, segs: [Segment]) -> some View {
@@ -83,63 +122,50 @@ struct TimetableView: View {
                     Rectangle()
                         .fill(Color.clear)
                         .frame(width: w, height: unit)
-                        .overlay(alignment: .top) {
-                            Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 0.5)
-                        }
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.line).frame(height: 1) }
                         .contentShape(Rectangle())
                         .offset(y: CGFloat(i) * unit)
                         .onTapGesture {
                             sheet = .schedule(newClass(day: day, minutes: (from + i) * 60), isNew: true)
                         }
-                        .accessibilityLabel("\(Day.names[day])요일 \(from + i)시 고정 일정 추가")
+                        .accessibilityLabel("\(Day.names[day])요일 \(from + i)시 수업 추가")
                 }
                 ForEach(segs) { s in
                     block(s)
-                        .frame(width: max(w / CGFloat(s.lanes) - 3, 10),
+                        .frame(width: max(w / CGFloat(s.lanes) - 4, 10),
                                height: max(CGFloat(s.to - s.from) / 60 * unit - 2, 22))
-                        .offset(x: w * CGFloat(s.lane) / CGFloat(s.lanes) + 1.5,
+                        .offset(x: w * CGFloat(s.lane) / CGFloat(s.lanes) + 2,
                                 y: CGFloat(s.from - from * 60) / 60 * unit + 1)
                 }
             }
         }
         .frame(height: CGFloat(hours) * unit)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(Color.primary.opacity(0.06)).frame(width: 0.5)
-        }
+        .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
     }
 
     private func block(_ s: Segment) -> some View {
-        let color = Palette.color(s.item.color)
-        let range = Day.clock(s.from) + "–" + (s.to == 1440 ? "24:00" : Day.clock(s.to))
-        return VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(s.item.title)
                 .font(.system(size: 11, weight: .bold))
                 .lineLimit(3)
             if !s.item.place.isEmpty {
-                Text(s.item.place).font(.system(size: 10)).lineLimit(1).opacity(0.8)
+                Text(s.item.place).font(.system(size: 10)).lineLimit(1).opacity(0.85)
             }
-            Spacer(minLength: 0)
-            Text((s.continued ? "이어서 · " : "") + range)
-                .font(.system(size: 9, weight: .medium))
-                .opacity(0.7)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            if s.continued {
+                Text("이어서").font(.system(size: 9)).opacity(0.7)
+            }
         }
-        .padding(.horizontal, 5)
-        .padding(.vertical, 4)
+        .padding(6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .foregroundStyle(Color.primary)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(color.opacity(0.24)))
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 3).padding(.vertical, 3)
-        }
+        .foregroundStyle(Palette.strong(s.item.color))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.soft(s.item.color)))
         .contentShape(Rectangle())
         .onTapGesture { sheet = .schedule(s.item, isNew: false) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
     }
 
-    // MARK: 블록 배치 (웹앱과 같은 규칙)
+    // MARK: 블록 배치
 
     private func segments() -> [Segment] {
         var out: [Segment] = []
