@@ -156,8 +156,16 @@ actor NotificationScheduler {
     // MARK: 카톡처럼 (커뮤니케이션 알림, 실험)
 
     static func usesChatStyle(_ settings: AppSettings) -> Bool {
-        settings.chatStyle && Nag.sender(settings: settings) != nil
+        chatSupported && settings.chatStyle && Nag.sender(settings: settings) != nil
     }
+
+    /// 설치할 때 받은 서명(프로비저닝 프로필)에 커뮤니케이션 알림 권한이 실제로 들어 있는지.
+    /// 무료 계정 + SideStore는 이 권한을 빼고 서명해서, 없으면 iOS가 왼쪽 사진을 그리지 않는다.
+    static let chatSupported: Bool = {
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url) else { return false }
+        return data.range(of: Data("com.apple.developer.usernotifications.communication".utf8)) != nil
+    }()
 
     /// 알림을 '보낸 사람이 있는 메시지'로 바꾼다. 앱 아이콘 자리에 보낸 사람 사진이 뜨고,
     /// 구석에 작게 Dayline 아이콘이 붙는다. 권한(서명)이 없으면 원래 알림 + 오른쪽 사진으로 돌아간다.

@@ -136,9 +136,9 @@ struct SettingsView: View {
             if store.settings.effectiveTone == .custom {
                 NotificationPreview(title: Nag.title(settings: store.settings, item: sample),
                                     message: Nag.body(settings: store.settings, item: sample, minutesBefore: 30),
-                                    showsPhoto: store.hasAvatar && !store.settings.chatStyle,
+                                    showsPhoto: store.hasAvatar && !NotificationScheduler.usesChatStyle(store.settings),
                                     version: store.avatarVersion,
-                                    chatStyle: store.settings.chatStyle && store.settings.customTone?.sender != nil)
+                                    chatStyle: NotificationScheduler.usesChatStyle(store.settings))
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
             }
@@ -149,10 +149,13 @@ struct SettingsView: View {
                     Toggle(isOn: $store.settings.chatStyle) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("카톡처럼 왼쪽에 사진 (실험)")
-                            Text("앱 아이콘 자리에 프로필 사진이 떠요. 안 되면 끄면 원래대로 돌아가요.")
+                            Text(NotificationScheduler.chatSupported
+                                 ? "앱 아이콘 자리에 프로필 사진이 떠요."
+                                 : "지금 서명(무료 계정)에는 이 권한이 없어서 사진은 오른쪽에 붙어요. 유료 개발자 계정으로 설치하면 켜져요.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                    .disabled(!NotificationScheduler.chatSupported)
                 }
                 HStack(spacing: 12) {
                     AvatarView(version: store.avatarVersion, size: 40)
