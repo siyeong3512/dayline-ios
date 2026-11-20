@@ -16,10 +16,35 @@ enum Nag {
             .replacingOccurrences(of: "{time}", with: item.time)
     }
 
-    /// 보낸 사람 이름이 있는 말투면 그 이름, 아니면 nil
+    /// 설정 > 보낸 사람에서 고른 사람 이름 (없으면 nil → 알림 제목은 일정 이름)
     static func sender(settings: AppSettings) -> String? {
-        settings.effectiveTone == .custom ? settings.customTone?.sender : nil
+        settings.activePerson?.name
     }
+
+    // MARK: 할 일 체크
+
+    /// 할 일 체크 알림 문장. period: "오늘"/"이번 주"/"이번 달"
+    static func todoLine(settings: AppSettings, period: String, count: Int, seed: String) -> String {
+        let pool: [String]
+        switch settings.effectiveTone {
+        case .custom:
+            let lines = settings.customTone?.todo ?? []
+            pool = lines.isEmpty ? friendTodo : lines
+        case .plain: pool = ["{period} 할 일 {count}개가 남았어요."]
+        case .gentle: pool = ["{period} 할 일 {count}개 남았어요. 하나씩 해볼까요?",
+                              "{period} 거의 다 왔어요. {count}개만 더 하면 끝이에요."]
+        case .friend: pool = friendTodo
+        case .strict: pool = ["{period} 할 일 {count}개 미완료. 핑계 없이 지금 해.",
+                              "{count}개 남았다. 폰 내려놓고 끝내라."]
+        }
+        let pick = pool[Int(stableHash(seed + settings.effectiveTone.rawValue) % UInt64(pool.count))]
+        return pick
+            .replacingOccurrences(of: "{period}", with: period)
+            .replacingOccurrences(of: "{count}", with: "\(count)")
+    }
+
+    private static let friendTodo = ["야 {period} 할 일 {count}개 남았다. 자기 전에 끝내자.",
+                                     "{period} 거 다 했냐? 아직 {count}개 남음."]
 
     /// 알림 제목: 보낸 사람이 있으면 그 사람 이름(톡처럼), 없으면 일정 이름
     static func title(settings: AppSettings, item: ScheduleItem) -> String {

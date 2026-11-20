@@ -22,17 +22,11 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var notice: String?
     @State private var speaker = AVSpeechSynthesizer()
-    @State private var photoItem: PhotosPickerItem?
-    @State private var senderDraft = ""
 
-    /// 말투 파일과 상관없이 알림 제목(보낸 사람)을 바꾼다. 비우면 일정 이름이 제목.
-    private func applySender() {
-        guard store.settings.customTone != nil else { return }
-        let name = senderDraft.trimmingCharacters(in: .whitespaces)
-        var s = store.settings
-        s.customTone?.sender = name.isEmpty ? nil : name
-        store.settings = s
-        senderDraft = name
+    /// 할 일 체크 시각 (설정은 분 단위로 저장)
+    private var todoTime: Binding<Date> {
+        Binding(get: { Day.time(fromMinutes: store.settings.todoCheckMinutes) },
+                set: { store.settings.todoCheckMinutes = Day.minutesOfDay($0) })
     }
 
     private let sample = ScheduleItem(id: "sample", kind: .timetable, title: "자료구조", place: "K501",
@@ -42,6 +36,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 notificationSection
+                todoCheckSection
                 liveActivitySection
                 toneSection
                 voiceSection
@@ -65,18 +60,27 @@ struct SettingsView: View {
             }
             .task { await refresh() }
             .onChange(of: phase) { _, p in if p == .active { Task { await refresh() } } }
-            .onChange(of: photoItem) { _, item in
-                guard let item else { return }
-                Task {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let jpeg = AvatarImage.prepare(data) {
-                        store.setAvatar(jpeg)
-                    } else {
-                        notice = "사진을 불러오지 못했어요. 다른 사진으로 해보세요."
-                    }
-                    photoItem = nil
+        }
+    }
+
+    // MARK: 할 일 체크
+
+    private var todoCheckSection: some View {
+        Section {
+            Toggle("할 일 체크 알림", isOn: $store.settings.todoCheck)
+            if store.settings.todoCheck {
+                DatePicker("알림 시각", selection: todoTime, displayedComponents: .hourAndMinute)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("미리보기").font(.caption).foregroundStyle(.secondary)
+                    Text(Nag.todoLine(settings: store.settings, period: "오늘", count: 2, seed: "preview"))
+                        .font(.subheadline)
                 }
+                .padding(.vertical, 2)
             }
+        } header: {
+            Text("할 일 체크")
+        } footer: {
+            Text("이 시각에 아직 안 끝낸 할 일이 있으면 알려줘요. Daily는 매일, Weekly는 일요일(또는 마감 요일), Monthly는 말일(또는 마감일)에 함께 챙겨요. 다 체크한 날은 알림이 오지 않아요.")
         }
     }
 
@@ -169,51 +173,45 @@ struct SettingsView: View {
                 }
             }
             .padding(.vertical, 2)
-            if store.settings.effectiveTone == .custom {
-                NotificationPreview(title: Nag.title(settings: store.settings, item: sample),
-                                    message: Nag.body(settings: store.settings, item: sample, minutesBefore: 30),
-                                    showsPhoto: store.hasAvatar && !NotificationScheduler.usesChatStyle(store.settings),
-                                    version: store.avatarVersion,
-                                    chatStyle: NotificationScheduler.usesChatStyle(store.settings))
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+
+            NavigationLink {
+                PeopleView()
+            } label: {
+                HStack(spacing: 12) {
+                    AvatarView(personID: store.settings.activePerson?.id, version: store.avatarVersion, size: 36)
+                    Text("보낸 사람")
+                    Spacer()
+                    Text(store.settings.activePerson?.name ?? "없음").foregroundStyle(.secondary)
+                }
             }
+
+            let personID = store.settings.activePerson?.id
+            let hasPhoto = Store.activeAvatarURL(store.settings) != nil
+            let chat = NotificationScheduler.usesChatStyle(store.settings)
+            NotificationPreview(title: Nag.title(settings: store.settings, item: sample),
+                                message: Nag.body(settings: store.settings, item: sample, minutesBefore: 30),
+                                showsPhoto: hasPhoto && !chat,
+                                personID: personID,
+                                version: store.avatarVersion,
+                                chatStyle: chat)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+
+            if store.settings.activePerson != nil {
+                Toggle(isOn: $store.settings.chatStyle) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("카톡처럼 왼쪽에 사진 (실험)")
+                        Text(NotificationScheduler.chatSupported
+                             ? "앱 아이콘 자리에 프로필 사진이 떠요."
+                             : "지금 서명(무료 계정)에는 이 권한이 없어서 사진은 오른쪽에 붙어요. 유료 개발자 계정으로 설치하면 켜져요.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(!NotificationScheduler.chatSupported)
+            }
+
             if let custom = store.settings.customTone {
                 LabeledContent(custom.name, value: "문장 \(custom.count)개")
-                LabeledContent("보낸 사람") {
-                    TextField("비우면 일정 이름", text: $senderDraft)
-                        .multilineTextAlignment(.trailing)
-                        .submitLabel(.done)
-                        .onSubmit { applySender() }
-                }
-                .onAppear { senderDraft = custom.sender ?? "" }
-                .onChange(of: custom.name) { _, _ in senderDraft = store.settings.customTone?.sender ?? "" }
-                if (custom.sender ?? "") != senderDraft.trimmingCharacters(in: .whitespaces) {
-                    Button("보낸 사람 이름 적용") { applySender() }
-                }
-                if custom.sender != nil {
-                    Toggle(isOn: $store.settings.chatStyle) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("카톡처럼 왼쪽에 사진 (실험)")
-                            Text(NotificationScheduler.chatSupported
-                                 ? "앱 아이콘 자리에 프로필 사진이 떠요."
-                                 : "지금 서명(무료 계정)에는 이 권한이 없어서 사진은 오른쪽에 붙어요. 유료 개발자 계정으로 설치하면 켜져요.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(!NotificationScheduler.chatSupported)
-                }
-                HStack(spacing: 12) {
-                    AvatarView(version: store.avatarVersion, size: 40)
-                    PhotosPicker(selection: $photoItem, matching: .images) {
-                        Text(store.hasAvatar ? "프로필 사진 바꾸기" : "프로필 사진 고르기")
-                    }
-                    Spacer()
-                    if store.hasAvatar {
-                        Button("지우기", role: .destructive) { store.setAvatar(nil) }
-                            .buttonStyle(.borderless)
-                    }
-                }
                 Button("나만의 말투 지우기", role: .destructive) {
                     if store.settings.tone == .custom { store.settings.tone = .friend }
                     store.settings.customTone = nil
@@ -228,7 +226,7 @@ struct SettingsView: View {
         } header: {
             Text("잔소리")
         } footer: {
-            Text("나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 보낸 사람 이름이 있으면 알림 제목이 그 이름이 되고, 프로필 사진은 알림 오른쪽에 붙어요. 문장과 사진은 이 아이폰 안에만 저장돼요.")
+            Text("말투와 보낸 사람은 따로 골라요. 보낸 사람의 이름이 알림 제목이 되고 사진은 알림 오른쪽과 잠금화면 카드에 붙어요. 나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 문장과 사진은 이 아이폰 안에만 저장돼요.")
         }
     }
 
@@ -306,12 +304,21 @@ struct SettingsView: View {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             do {
                 let data = try Data(contentsOf: url)
-                if let tone = CustomTone.decodeFile(data) {
+                if var tone = CustomTone.decodeFile(data) {
                     var s = store.settings
+                    var extra = ""
+                    // 말투 파일에 보낸 사람 이름이 있으면 '보낸 사람' 목록에 추가(이미 있으면 그대로)
+                    if let name = tone.sender, !s.people.contains(where: { $0.name == name }) {
+                        let person = Person(name: name)
+                        s.people.append(person)
+                        if s.activePersonID == nil { s.activePersonID = person.id }
+                        extra = " ‘\(name)’도 보낸 사람 목록에 추가했어요."
+                    }
+                    tone.sender = nil
                     s.customTone = tone
                     s.tone = .custom
                     store.settings = s
-                    notice = "‘\(tone.name)’ 말투를 가져왔어요 (문장 \(tone.count)개). 잔소리 말투가 이걸로 바뀌었어요."
+                    notice = "‘\(tone.name)’ 말투를 가져왔어요 (문장 \(tone.count)개)." + extra
                     return
                 }
                 let r = try store.importData(data)

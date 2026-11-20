@@ -33,7 +33,7 @@ actor NotificationScheduler {
         let trigger: UNCalendarNotificationTrigger
     }
 
-    static func plans(items: [ScheduleItem], now: Date = Date()) -> [Plan] {
+    static func plans(items: [ScheduleItem], now: Date = Date(), limit: Int = 60) -> [Plan] {
         let cal = Day.cal
         let todayKey = Day.key(now)
         var out: [Plan] = []
@@ -78,13 +78,65 @@ actor NotificationScheduler {
                 }
             }
         }
-        return Array(out.sorted { $0.next < $1.next }.prefix(limit))
+        return Array(out.sorted { $0.next < $1.next }.prefix(max(limit, 0)))
     }
 
-    func reschedule(items: [ScheduleItem], settings: AppSettings) async {
+    // MARK: 할 일 체크 알림
+
+    struct TodoPlan {
+        let id: String
+        let key: String
+        let fire: Date
+        let period: String
+        let titles: [String]
+    }
+
+    /// 앞으로 7일 동안 매일 정한 시각에, 아직 안 끝낸 할 일이 있으면 알린다.
+    /// Daily는 매일, Weekly는 일요일(또는 마감 요일), Monthly는 말일(또는 마감일)에 포함.
+    /// 체크할 때마다 다시 계산하므로 다 끝낸 날의 알림은 사라진다.
+    static func todoPlans(todos: [TodoItem], settings: AppSettings, now: Date = Date()) -> [TodoPlan] {
+        guard settings.todoCheck else { return [] }
+        let active = todos.filter { !$0.archived }
+        guard !active.isEmpty else { return [] }
+        let today = Day.cal.startOfDay(for: now)
+        var out: [TodoPlan] = []
+        for d in 0..<7 {
+            let day = Day.add(today, d)
+            let key = Day.key(day)
+            guard let fire = Day.cal.date(byAdding: .minute, value: settings.todoCheckMinutes, to: day), fire > now else { continue }
+            let isSunday = Day.weekday(day) == 0
+            let isMonthEnd = Day.cal.component(.month, from: Day.add(day, 1)) != Day.cal.component(.month, from: day)
+            let left = active.filter { t in
+                guard !t.isDone(on: key) else { return false }
+                switch t.cadence {
+                case .daily: return true
+                case .weekly: return isSunday || t.dueKey(on: key) == key
+                case .monthly: return isMonthEnd || t.dueKey(on: key) == key
+                }
+            }
+            guard !left.isEmpty else { continue }
+            let period = left.contains { $0.cadence == .monthly } ? "이번 달"
+                : left.contains { $0.cadence == .weekly } ? "이번 주" : "오늘"
+            let titles = left.sorted { $0.cadence.order < $1.cadence.order }.map(\.title)
+            out.append(TodoPlan(id: "todo|\(key)", key: key, fire: fire, period: period, titles: titles))
+        }
+        return out
+    }
+
+    static func todoBody(_ p: TodoPlan, settings: AppSettings) -> String {
+        let line = Nag.todoLine(settings: settings, period: p.period, count: p.titles.count, seed: p.key)
+        let shown = p.titles.prefix(3).joined(separator: " · ")
+        let more = p.titles.count > 3 ? " 외 \(p.titles.count - 3)개" : ""
+        return line + "\n" + shown + more
+    }
+
+    // MARK: 예약
+
+    func reschedule(items: [ScheduleItem], todos: [TodoItem], settings: AppSettings) async {
         generation += 1
         let gen = generation
-        let list = Self.plans(items: items)
+        let todoList = Self.todoPlans(todos: todos, settings: settings)
+        let list = Self.plans(items: items, limit: Self.limit - todoList.count)
         var requests: [UNNotificationRequest] = []
         var usedSounds = Set<String>()
 
@@ -93,20 +145,21 @@ actor NotificationScheduler {
             content.title = Nag.title(settings: settings, item: p.item)
             content.body = Nag.body(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
             content.threadIdentifier = Nag.sender(settings: settings).map { "sender-" + $0 } ?? p.item.id
-            content.sound = .default
-            let chat = Self.usesChatStyle(settings)
-            if !chat, let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
-            if settings.voiceEnabled {
-                let text = Nag.spoken(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
-                if let name = await voice.soundFile(text: text, voiceID: settings.voiceID) {
-                    usedSounds.insert(name)
-                    content.sound = UNNotificationSound(named: UNNotificationSoundName(name))
-                }
-                // 목소리 파일을 만드는 동안 일정이 또 바뀌었으면 이번 작업은 버린다
-                guard gen == generation else { return }
-            }
-            let final: UNNotificationContent = chat ? Self.chatContent(content, settings: settings) : content
+            let spoken = Nag.spoken(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
+            guard let final = await decorate(content, spoken: spoken, settings: settings, gen: gen, used: &usedSounds) else { return }
             requests.append(UNNotificationRequest(identifier: p.id, content: final, trigger: p.trigger))
+        }
+
+        for p in todoList {
+            let content = UNMutableNotificationContent()
+            content.title = Nag.sender(settings: settings) ?? "할 일 체크"
+            content.body = Self.todoBody(p, settings: settings)
+            content.threadIdentifier = "todo-check"
+            let spoken = Nag.speakable(Nag.todoLine(settings: settings, period: p.period, count: p.titles.count, seed: p.key))
+            guard let final = await decorate(content, spoken: spoken, settings: settings, gen: gen, used: &usedSounds) else { return }
+            let comps = Day.cal.dateComponents([.year, .month, .day, .hour, .minute], from: p.fire)
+            requests.append(UNNotificationRequest(identifier: p.id, content: final,
+                                                  trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
         }
 
         guard gen == generation else { return }
@@ -115,13 +168,27 @@ actor NotificationScheduler {
         voice.cleanup(keeping: usedSounds)
     }
 
-    /// 나만의 말투 + 프로필 사진이 있으면 알림 오른쪽에 사진을 붙인다.
+    /// 소리(목소리)·사진·카톡식 처리를 붙인다. 그 사이 일정이 또 바뀌었으면 nil
+    private func decorate(_ content: UNMutableNotificationContent, spoken: String, settings: AppSettings,
+                          gen: Int, used: inout Set<String>) async -> UNNotificationContent? {
+        content.sound = .default
+        let chat = Self.usesChatStyle(settings)
+        if !chat, let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
+        if settings.voiceEnabled {
+            if let name = await voice.soundFile(text: spoken, voiceID: settings.voiceID) {
+                used.insert(name)
+                content.sound = UNNotificationSound(named: UNNotificationSoundName(name))
+            }
+            guard gen == generation else { return nil }
+        }
+        return chat ? Self.chatContent(content, settings: settings) : content
+    }
+
+    /// 보낸 사람 사진이 있으면 알림 오른쪽에 붙인다.
     /// iOS가 첨부 파일을 옮겨 가므로 알림마다 복사본을 만든다.
     static func avatarAttachment(settings: AppSettings) -> UNNotificationAttachment? {
-        guard settings.effectiveTone == .custom else { return nil }
         let fm = FileManager.default
-        let source = Store.avatarURL
-        guard fm.fileExists(atPath: source.path) else { return nil }
+        guard let source = Store.activeAvatarURL(settings) else { return nil }
         let copy = fm.temporaryDirectory.appendingPathComponent("avatar-\(UUID().uuidString).jpg")
         do {
             try fm.copyItem(at: source, to: copy)
@@ -172,7 +239,7 @@ actor NotificationScheduler {
     static func chatContent(_ content: UNMutableNotificationContent, settings: AppSettings) -> UNNotificationContent {
         guard let sender = Nag.sender(settings: settings) else { return content }
         var image: INImage?
-        if let data = try? Data(contentsOf: Store.avatarURL) { image = INImage(imageData: data) }
+        if let url = Store.activeAvatarURL(settings), let data = try? Data(contentsOf: url) { image = INImage(imageData: data) }
         let person = INPerson(personHandle: INPersonHandle(value: "dayline-sender", type: .unknown),
                               nameComponents: nil,
                               displayName: sender,

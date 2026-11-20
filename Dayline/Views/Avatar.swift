@@ -19,8 +19,8 @@ enum AvatarImage {
     }
 
     /// 라이브 액티비티용 아주 작은 썸네일. 크기 제한(4KB)을 넘지 않게 줄이고, 못 맞추면 nil.
-    static func thumbnail(maxBytes: Int = 2400) -> Data? {
-        guard let data = try? Data(contentsOf: Store.avatarURL), let image = UIImage(data: data) else { return nil }
+    static func thumbnail(from url: URL, maxBytes: Int = 2400) -> Data? {
+        guard let data = try? Data(contentsOf: url), let image = UIImage(data: data) else { return nil }
         for side in [84, 76, 68, 60, 52, 44] as [CGFloat] {
             let format = UIGraphicsImageRendererFormat.default()
             format.scale = 1
@@ -36,13 +36,15 @@ enum AvatarImage {
 }
 
 struct AvatarView: View {
+    /// 사람 id (nil이면 기본 아이콘)
+    let personID: String?
     /// 사진이 바뀔 때마다 다시 그리도록
     let version: Int
     var size: CGFloat = 44
 
     var body: some View {
         Group {
-            if let image = UIImage(contentsOfFile: Store.avatarURL.path) {
+            if let personID, let image = UIImage(contentsOfFile: Store.avatarURL(for: personID).path) {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
                 Image(systemName: "person.crop.circle.fill")
@@ -61,13 +63,14 @@ struct NotificationPreview: View {
     let title: String
     let message: String
     let showsPhoto: Bool
+    let personID: String?
     let version: Int
     var chatStyle = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             if chatStyle {
-                AvatarView(version: version, size: 38)
+                AvatarView(personID: personID, version: version, size: 38)
                     .overlay(alignment: .bottomTrailing) {
                         Image(systemName: "app.fill")
                             .font(.system(size: 13))
@@ -89,7 +92,7 @@ struct NotificationPreview: View {
                 Text(message).font(.subheadline).lineLimit(3)
             }
             if showsPhoto {
-                AvatarView(version: version, size: 38)
+                AvatarView(personID: personID, version: version, size: 38)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }

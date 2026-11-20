@@ -49,7 +49,7 @@ enum LiveActivityManager {
         let minutesLeft = max(Int((when.timeIntervalSinceNow / 60).rounded(.up)), 1)
         let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: minutesLeft)
         // 프로필 사진은 나만의 말투를 쓸 때만
-        let avatar = settings.effectiveTone == .custom ? AvatarImage.thumbnail() : nil
+        let avatar = Store.activeAvatarURL(settings).flatMap { AvatarImage.thumbnail(from: $0) }
         return NextUpAttributes.ContentState(
             itemID: x.id,
             title: x.title,

@@ -260,15 +260,18 @@ struct CustomTone: Codable, Equatable {
     var soon: [String]
     /// 10분 전
     var urgent: [String]
+    /// 할 일 체크 알림 ({period} {count} 사용)
+    var todo: [String]
 
-    enum CodingKeys: String, CodingKey { case name, sender, early, soon, urgent }
+    enum CodingKeys: String, CodingKey { case name, sender, early, soon, urgent, todo }
 
-    init(name: String, sender: String? = nil, early: [String], soon: [String], urgent: [String]) {
+    init(name: String, sender: String? = nil, early: [String], soon: [String], urgent: [String], todo: [String] = []) {
         self.name = name
         self.sender = sender
         self.early = early
         self.soon = soon
         self.urgent = urgent
+        self.todo = todo
     }
 
     init(from decoder: Decoder) throws {
@@ -279,10 +282,11 @@ struct CustomTone: Codable, Equatable {
         early = ((try? c.decode([String].self, forKey: .early)) ?? []).filter { !$0.isEmpty }
         soon = ((try? c.decode([String].self, forKey: .soon)) ?? []).filter { !$0.isEmpty }
         urgent = ((try? c.decode([String].self, forKey: .urgent)) ?? []).filter { !$0.isEmpty }
+        todo = ((try? c.decode([String].self, forKey: .todo)) ?? []).filter { !$0.isEmpty }
     }
 
     var isUsable: Bool { !(early.isEmpty && soon.isEmpty && urgent.isEmpty) }
-    var count: Int { early.count + soon.count + urgent.count }
+    var count: Int { early.count + soon.count + urgent.count + todo.count }
 
     /// 비어 있는 단계는 다른 단계 문장으로 채운다
     func pool(stage: Int) -> [String] {
@@ -325,6 +329,12 @@ enum ThemeMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// 알림을 보내는 사람(이름 + 프로필 사진). 사진은 Application Support/Dayline/avatars/<id>.jpg
+struct Person: Codable, Identifiable, Hashable {
+    var id: String = UUID().uuidString
+    var name: String
+}
+
 struct AppSettings: Codable, Equatable {
     var tone: NagTone = .friend
     var voiceEnabled = false
@@ -335,10 +345,25 @@ struct AppSettings: Codable, Equatable {
     var chatStyle = false
     /// 잠금화면·다이내믹 아일랜드 '다음 일정' 카드
     var liveActivity = true
+    /// 보낸 사람 목록과 지금 쓰는 사람(nil이면 일정 이름이 알림 제목)
+    var people: [Person] = []
+    var activePersonID: String?
+    /// 할 일 체크 알림
+    var todoCheck = true
+    /// 체크 시각(자정부터 분). 기본 밤 9시
+    var todoCheckMinutes = 21 * 60
 
     init() {}
 
-    enum CodingKeys: String, CodingKey { case tone, voiceEnabled, voiceID, theme, customTone, chatStyle, liveActivity }
+    enum CodingKeys: String, CodingKey {
+        case tone, voiceEnabled, voiceID, theme, customTone, chatStyle, liveActivity
+        case people, activePersonID, todoCheck, todoCheckMinutes
+    }
+
+    var activePerson: Person? {
+        guard let id = activePersonID else { return nil }
+        return people.first { $0.id == id }
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -349,6 +374,11 @@ struct AppSettings: Codable, Equatable {
         customTone = try? c.decode(CustomTone.self, forKey: .customTone)
         chatStyle = (try? c.decode(Bool.self, forKey: .chatStyle)) ?? false
         liveActivity = (try? c.decode(Bool.self, forKey: .liveActivity)) ?? true
+        people = (try? c.decode([Person].self, forKey: .people)) ?? []
+        activePersonID = try? c.decode(String.self, forKey: .activePersonID)
+        todoCheck = (try? c.decode(Bool.self, forKey: .todoCheck)) ?? true
+        let rawMinutes = (try? c.decode(Int.self, forKey: .todoCheckMinutes)) ?? 21 * 60
+        todoCheckMinutes = min(max(rawMinutes, 0), 1439)
     }
 
     /// 나만의 말투를 골랐는데 파일이 없으면 '친구처럼'으로

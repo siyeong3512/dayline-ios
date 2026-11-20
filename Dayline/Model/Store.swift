@@ -26,6 +26,7 @@ final class Store: ObservableObject {
         try? FileManager.default.createDirectory(at: dir.appendingPathComponent("Backups", isDirectory: true),
                                                  withIntermediateDirectories: true)
         load()
+        afterLoad()
     }
 
     // MARK: 저장
@@ -45,6 +46,11 @@ final class Store: ObservableObject {
             try? FileManager.default.copyItem(at: fileURL, to: backupDir.appendingPathComponent(name))
             lastError = "저장 파일을 읽지 못했어요. 설정 > 자동 백업에서 복구할 수 있어요."
         }
+    }
+
+    /// 앱 시작 때 한 번: 예전 데이터 옮기기
+    private func afterLoad() {
+        migrateLegacySender()
     }
 
     private func save() {
@@ -210,7 +216,7 @@ final class Store: ObservableObject {
         let previous = todos.first { $0.id == t.id }?.updatedAt ?? 0
         t.updatedAt = max(Day.nowMillis(), previous + 1)
         if let i = todos.firstIndex(where: { $0.id == t.id }) { todos[i] = t } else { todos.append(t) }
-        save()
+        commit() // 할 일 체크 알림도 다시 계산
     }
 
     func archiveTodo(_ t: TodoItem) {
@@ -226,32 +232,92 @@ final class Store: ObservableObject {
         if x.completed[p] != nil { x.completed.removeValue(forKey: p) } else { x.completed[p] = Day.nowMillis() }
         x.updatedAt = max(Day.nowMillis(), x.updatedAt + 1)
         todos[i] = x
-        save()
+        commit() // 다 끝낸 날은 체크 알림이 빠지도록
     }
 
-    // MARK: 프로필 사진 (나만의 말투의 보낸 사람 사진, 기기 안에만 저장)
+    // MARK: 보낸 사람 (이름 + 프로필 사진, 기기 안에만 저장)
 
-    static var avatarURL: URL {
+    private static var baseDir: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Dayline", isDirectory: true)
-            .appendingPathComponent("avatar.jpg")
+    }
+
+    /// 예전 버전의 사진 하나짜리 위치
+    private static var legacyAvatarURL: URL { baseDir.appendingPathComponent("avatar.jpg") }
+
+    static func avatarURL(for id: String) -> URL {
+        baseDir.appendingPathComponent("avatars", isDirectory: true).appendingPathComponent("\(id).jpg")
+    }
+
+    /// 지금 쓰는 사람의 사진 (없으면 nil)
+    static func activeAvatarURL(_ settings: AppSettings) -> URL? {
+        guard let id = settings.activePerson?.id else { return nil }
+        let url = avatarURL(for: id)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     @Published private(set) var avatarVersion = 0
 
-    var hasAvatar: Bool { FileManager.default.fileExists(atPath: Self.avatarURL.path) }
+    func hasAvatar(_ id: String) -> Bool { FileManager.default.fileExists(atPath: Self.avatarURL(for: id).path) }
 
-    func setAvatar(_ data: Data?) {
+    func setAvatar(_ data: Data?, for id: String) {
+        let url = Self.avatarURL(for: id)
         if let data {
-            do { try data.write(to: Self.avatarURL, options: [.atomic]) } catch {
+            do {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: url, options: [.atomic])
+            } catch {
                 lastError = "사진을 저장하지 못했어요: \(error.localizedDescription)"
                 return
             }
         } else {
-            try? FileManager.default.removeItem(at: Self.avatarURL)
+            try? FileManager.default.removeItem(at: url)
         }
         avatarVersion += 1
         reschedule()
+    }
+
+    /// 사람 추가·수정. 이름이 비면 저장하지 않는다
+    func upsertPerson(_ p: Person, makeActive: Bool) {
+        var s = settings
+        if let i = s.people.firstIndex(where: { $0.id == p.id }) { s.people[i] = p } else { s.people.append(p) }
+        if makeActive { s.activePersonID = p.id }
+        settings = s
+    }
+
+    func deletePerson(_ p: Person) {
+        var s = settings
+        s.people.removeAll { $0.id == p.id }
+        if s.activePersonID == p.id { s.activePersonID = nil }
+        try? FileManager.default.removeItem(at: Self.avatarURL(for: p.id))
+        avatarVersion += 1
+        settings = s
+    }
+
+    func setActivePerson(_ id: String?) {
+        var s = settings
+        s.activePersonID = id
+        settings = s
+    }
+
+    /// 예전 버전(말투 파일의 sender + 사진 하나)을 '보낸 사람' 목록으로 옮긴다
+    private func migrateLegacySender() {
+        guard settings.people.isEmpty else { return }
+        let fm = FileManager.default
+        let hasLegacyPhoto = fm.fileExists(atPath: Self.legacyAvatarURL.path)
+        let legacyName = settings.customTone?.sender
+        guard hasLegacyPhoto || legacyName != nil else { return }
+        let person = Person(name: legacyName ?? "보낸 사람")
+        if hasLegacyPhoto {
+            let target = Self.avatarURL(for: person.id)
+            try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? fm.moveItem(at: Self.legacyAvatarURL, to: target)
+        }
+        var s = settings
+        s.people = [person]
+        s.activePersonID = person.id
+        s.customTone?.sender = nil
+        settings = s
     }
 
     // MARK: 알림
@@ -263,8 +329,11 @@ final class Store: ObservableObject {
 
     func reschedule() {
         let snapshotItems = items
+        let snapshotTodos = todos
         let snapshotSettings = settings
-        Task { await NotificationScheduler.shared.reschedule(items: snapshotItems, settings: snapshotSettings) }
+        Task {
+            await NotificationScheduler.shared.reschedule(items: snapshotItems, todos: snapshotTodos, settings: snapshotSettings)
+        }
         LiveActivityManager.refresh(store: self)
     }
 }
