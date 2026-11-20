@@ -17,6 +17,22 @@ enum AvatarImage {
         }
         return output.jpegData(compressionQuality: 0.85)
     }
+
+    /// 라이브 액티비티용 아주 작은 썸네일. 크기 제한(4KB)을 넘지 않게 줄이고, 못 맞추면 nil.
+    static func thumbnail(maxBytes: Int = 2400) -> Data? {
+        guard let data = try? Data(contentsOf: Store.avatarURL), let image = UIImage(data: data) else { return nil }
+        for side in [56, 48, 40, 32] as [CGFloat] {
+            let format = UIGraphicsImageRendererFormat.default()
+            format.scale = 1
+            let small = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+                image.draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+            }
+            for quality in [0.6, 0.45, 0.3] as [CGFloat] {
+                if let jpeg = small.jpegData(compressionQuality: quality), jpeg.count <= maxBytes { return jpeg }
+            }
+        }
+        return nil
+    }
 }
 
 struct AvatarView: View {

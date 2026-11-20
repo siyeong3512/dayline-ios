@@ -24,7 +24,7 @@ enum LiveActivityManager {
             return
         }
 
-        var state = makeState(next.item, next.when)
+        var state = makeState(next.item, next.when, settings: settings)
         if let same = current.first(where: { $0.content.state.itemID == state.itemID && $0.content.state.start == state.start }) {
             state.from = same.content.state.from // 카운트다운이 처음부터 다시 시작하지 않게
             await same.update(ActivityContent(state: state, staleDate: next.when))
@@ -38,13 +38,18 @@ enum LiveActivityManager {
                                   pushType: nil)
     }
 
-    static func makeState(_ x: ScheduleItem, _ when: Date) -> NextUpAttributes.ContentState {
+    static func makeState(_ x: ScheduleItem, _ when: Date, settings: AppSettings) -> NextUpAttributes.ContentState {
         let timeLabel: String
         if x.kind == .timetable {
             timeLabel = x.time + " – " + (x.end % 1440 == 0 && x.end > 0 ? "24:00" : Day.clock(x.end))
         } else {
             timeLabel = x.time
         }
+        // 잔소리 한 줄: 지금 남은 시간 기준 (앱을 열 때마다 새로 계산)
+        let minutesLeft = max(Int((when.timeIntervalSinceNow / 60).rounded(.up)), 1)
+        let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: minutesLeft)
+        // 프로필 사진은 나만의 말투를 쓸 때만
+        let avatar = settings.effectiveTone == .custom ? AvatarImage.thumbnail() : nil
         return NextUpAttributes.ContentState(
             itemID: x.id,
             title: x.title,
@@ -53,6 +58,9 @@ enum LiveActivityManager {
             timeLabel: timeLabel,
             colorHex: Palette.hex[min(max(x.color, 0), Palette.hex.count - 1)],
             from: Date(),
-            start: when)
+            start: when,
+            sender: Nag.sender(settings: settings),
+            line: line,
+            avatar: avatar)
     }
 }

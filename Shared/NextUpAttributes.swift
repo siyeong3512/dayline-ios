@@ -17,6 +17,12 @@ struct NextUpAttributes: ActivityAttributes {
         var from: Date
         /// 일정 시작 시각
         var start: Date
+        /// 나만의 말투의 보낸 사람 이름
+        var sender: String?
+        /// 잔소리 한 줄
+        var line: String?
+        /// 프로필 사진 썸네일(JPEG, 2~3KB). 라이브 액티비티 데이터는 4KB 제한이라 아주 작게.
+        var avatar: Data?
     }
 
     static func color(_ hex: String) -> Color {
