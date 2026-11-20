@@ -1,4 +1,5 @@
 import Foundation
+import Intents
 import UserNotifications
 
 /// 알림은 서버 없이 아이폰이 직접 예약한다(로컬 알림).
@@ -93,7 +94,8 @@ actor NotificationScheduler {
             content.body = Nag.body(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
             content.threadIdentifier = Nag.sender(settings: settings).map { "sender-" + $0 } ?? p.item.id
             content.sound = .default
-            if let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
+            let chat = Self.usesChatStyle(settings)
+            if !chat, let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
             if settings.voiceEnabled {
                 let text = Nag.spoken(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
                 if let name = await voice.soundFile(text: text, voiceID: settings.voiceID) {
@@ -103,7 +105,8 @@ actor NotificationScheduler {
                 // 목소리 파일을 만드는 동안 일정이 또 바뀌었으면 이번 작업은 버린다
                 guard gen == generation else { return }
             }
-            requests.append(UNNotificationRequest(identifier: p.id, content: content, trigger: p.trigger))
+            let final: UNNotificationContent = chat ? Self.chatContent(content, settings: settings) : content
+            requests.append(UNNotificationRequest(identifier: p.id, content: final, trigger: p.trigger))
         }
 
         guard gen == generation else { return }
@@ -137,14 +140,52 @@ actor NotificationScheduler {
         content.title = Nag.title(settings: settings, item: sample)
         content.body = Nag.body(settings: settings, item: sample, minutesBefore: 30)
         content.sound = .default
-        if let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
+        let chat = Self.usesChatStyle(settings)
+        if !chat, let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
         if settings.voiceEnabled,
            let name = await voice.soundFile(text: Nag.spoken(settings: settings, item: sample, minutesBefore: 30),
                                             voiceID: settings.voiceID) {
             content.sound = UNNotificationSound(named: UNNotificationSoundName(name))
         }
+        let final: UNNotificationContent = chat ? Self.chatContent(content, settings: settings) : content
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
         try? await center.add(UNNotificationRequest(identifier: "dayline-test-\(UUID().uuidString)",
-                                                    content: content, trigger: trigger))
+                                                    content: final, trigger: trigger))
+    }
+
+    // MARK: 카톡처럼 (커뮤니케이션 알림, 실험)
+
+    static func usesChatStyle(_ settings: AppSettings) -> Bool {
+        settings.chatStyle && Nag.sender(settings: settings) != nil
+    }
+
+    /// 알림을 '보낸 사람이 있는 메시지'로 바꾼다. 앱 아이콘 자리에 보낸 사람 사진이 뜨고,
+    /// 구석에 작게 Dayline 아이콘이 붙는다. 권한(서명)이 없으면 원래 알림 + 오른쪽 사진으로 돌아간다.
+    static func chatContent(_ content: UNMutableNotificationContent, settings: AppSettings) -> UNNotificationContent {
+        guard let sender = Nag.sender(settings: settings) else { return content }
+        var image: INImage?
+        if let data = try? Data(contentsOf: Store.avatarURL) { image = INImage(imageData: data) }
+        let person = INPerson(personHandle: INPersonHandle(value: "dayline-sender", type: .unknown),
+                              nameComponents: nil,
+                              displayName: sender,
+                              image: image,
+                              contactIdentifier: nil,
+                              customIdentifier: "dayline-sender")
+        let intent = INSendMessageIntent(recipients: nil,
+                                         outgoingMessageType: .outgoingMessageText,
+                                         content: content.body,
+                                         speakableGroupName: nil,
+                                         conversationIdentifier: "dayline-" + sender,
+                                         serviceName: nil,
+                                         sender: person,
+                                         attachments: nil)
+        if let image { intent.setImage(image, forParameterNamed: \.sender) }
+        let interaction = INInteraction(intent: intent, response: nil)
+        interaction.direction = .incoming
+        interaction.donate(completion: nil)
+        if let updated = try? content.updating(from: intent) { return updated }
+        // 권한이 없어서 실패: 오른쪽 사진 방식으로
+        if let photo = avatarAttachment(settings: settings) { content.attachments = [photo] }
+        return content
     }
 }

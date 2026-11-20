@@ -27,6 +27,7 @@ targets:
         CODE_SIGNING_ALLOWED: "NO"
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: ""
+        CODE_SIGN_ENTITLEMENTS: Dayline/Dayline.entitlements
     info:
       path: Dayline/Info.plist
       properties:
@@ -38,5 +39,7 @@ targets:
         UIApplicationSupportsIndirectInputEvents: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        NSUserActivityTypes:
+          - INSendMessageIntent
         LSSupportsOpeningDocumentsInPlace: false
         UIFileSharingEnabled: false

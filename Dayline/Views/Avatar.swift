@@ -46,13 +46,24 @@ struct NotificationPreview: View {
     let message: String
     let showsPhoto: Bool
     let version: Int
+    var chatStyle = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "app.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(Color.primary.opacity(0.85))
-                .frame(width: 38, height: 38)
+            if chatStyle {
+                AvatarView(version: version, size: 38)
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "app.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.primary)
+                            .offset(x: 3, y: 3)
+                    }
+            } else {
+                Image(systemName: "app.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(Color.primary.opacity(0.85))
+                    .frame(width: 38, height: 38)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(title).font(.subheadline.weight(.semibold))

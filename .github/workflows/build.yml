@@ -60,6 +60,10 @@ jobs:
           test -f "$APP/Info.plist"
           mkdir -p Payload
           cp -R "$APP" Payload/
+          # 권한(커뮤니케이션 알림)을 앱에 새겨 둔다. 실제 서명은 SideStore가 폰에서 다시 한다.
+          codesign --force --sign - --timestamp=none \
+            --entitlements Dayline/Dayline.entitlements Payload/Dayline.app
+          codesign -d --entitlements - Payload/Dayline.app
           zip -qry Dayline.ipa Payload
           ls -lh Dayline.ipa
 

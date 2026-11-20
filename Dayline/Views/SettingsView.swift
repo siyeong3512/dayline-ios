@@ -136,8 +136,9 @@ struct SettingsView: View {
             if store.settings.effectiveTone == .custom {
                 NotificationPreview(title: Nag.title(settings: store.settings, item: sample),
                                     message: Nag.body(settings: store.settings, item: sample, minutesBefore: 30),
-                                    showsPhoto: store.hasAvatar,
-                                    version: store.avatarVersion)
+                                    showsPhoto: store.hasAvatar && !store.settings.chatStyle,
+                                    version: store.avatarVersion,
+                                    chatStyle: store.settings.chatStyle && store.settings.customTone?.sender != nil)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
             }
@@ -145,6 +146,13 @@ struct SettingsView: View {
                 LabeledContent(custom.name, value: "문장 \(custom.count)개")
                 if let sender = custom.sender {
                     LabeledContent("보낸 사람(알림 제목)", value: sender)
+                    Toggle(isOn: $store.settings.chatStyle) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("카톡처럼 왼쪽에 사진 (실험)")
+                            Text("앱 아이콘 자리에 프로필 사진이 떠요. 안 되면 끄면 원래대로 돌아가요.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 HStack(spacing: 12) {
                     AvatarView(version: store.avatarVersion, size: 40)
