@@ -1,0 +1,70 @@
+import Foundation
+
+/// 알림 문구(잔소리). 같은 일정·같은 알림 시점이면 늘 같은 문장을 골라서,
+/// 목소리 파일도 다시 만들 필요가 없게 한다.
+enum Nag {
+    static func line(tone: NagTone, item: ScheduleItem, minutesBefore n: Int) -> String {
+        let pool = templates(tone: tone, minutesBefore: n)
+        let pick = pool[Int(stableHash("\(item.id)|\(n)|\(tone.rawValue)") % UInt64(pool.count))]
+        return pick
+            .replacingOccurrences(of: "{left}", with: ReminderOption.amount(n))
+            .replacingOccurrences(of: "{title}", with: item.title)
+            .replacingOccurrences(of: "{place}", with: item.place.isEmpty ? "거기" : item.place)
+            .replacingOccurrences(of: "{time}", with: item.time)
+    }
+
+    /// 알림 본문: 잔소리 + 시간·장소
+    static func body(tone: NagTone, item: ScheduleItem, minutesBefore n: Int) -> String {
+        let info = item.place.isEmpty ? item.time : "\(item.time) · \(item.place)"
+        if tone == .plain { return "\(ReminderOption.label(n)) · \(info)" }
+        return line(tone: tone, item: item, minutesBefore: n) + "\n" + info
+    }
+
+    /// 목소리로 읽을 문장
+    static func spoken(tone: NagTone, item: ScheduleItem, minutesBefore n: Int) -> String {
+        if tone == .plain { return "\(item.title), \(ReminderOption.amount(n)) 뒤에 시작해요." }
+        return "\(item.title). " + line(tone: tone, item: item, minutesBefore: n)
+    }
+
+    private static func templates(tone: NagTone, minutesBefore n: Int) -> [String] {
+        let stage = n <= 10 ? 2 : n <= 60 ? 1 : 0
+        switch tone {
+        case .plain:
+            return ["{left} 뒤 시작해요."]
+        case .gentle:
+            return [
+                ["{title}까지 {left} 남았어요. 천천히 준비해요.",
+                 "오늘 {title} 있는 날이에요. 미리 챙겨두면 마음이 편해요."],
+                ["{left} 뒤 {title}. 슬슬 준비해볼까요?",
+                 "{place}로 갈 시간이 다가와요. 물 한 잔 챙겨요."],
+                ["{left} 남았어요. 이제 출발해요!",
+                 "곧 {title} 시작이에요. 오늘도 잘할 거예요."]
+            ][stage]
+        case .friend:
+            return [
+                ["야, {title} {left} 남았다. 미리 챙겨둬.",
+                 "{title} 있는 거 안 잊었지? {left} 남음."],
+                ["{left} 뒤 {title}. 가방 챙겼냐.",
+                 "지금 나가야 여유 있다. {place} 가자."],
+                ["{left} 남았다. 아직 침대면 일어나라.",
+                 "{title} 곧 시작. 뛰어."]
+            ][stage]
+        case .strict:
+            return [
+                ["{title} {left} 전. 오늘은 핑계 없다.",
+                 "{left} 뒤 {title}. 준비 안 했으면 지금 해."],
+                ["{left} 남았다. 폰 내려놓고 준비해.",
+                 "{title} {left} 전. 늦으면 네 손해다."],
+                ["{left}. 지금 안 나가면 늦는다.",
+                 "{title} 곧 시작. 늦지 마라."]
+            ][stage]
+        }
+    }
+
+    /// 실행할 때마다 바뀌지 않는 해시(djb2)
+    static func stableHash(_ s: String) -> UInt64 {
+        var h: UInt64 = 5381
+        for b in s.utf8 { h = (h &<< 5) &+ h &+ UInt64(b) }
+        return h
+    }
+}

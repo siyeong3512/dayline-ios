@@ -1,0 +1,67 @@
+import SwiftUI
+
+enum EditorSheet: Identifiable {
+    case schedule(ScheduleItem, isNew: Bool)
+    case todo(TodoItem, isNew: Bool)
+
+    var id: String {
+        switch self {
+        case .schedule(let x, _): return "s-" + x.id
+        case .todo(let t, _): return "t-" + t.id
+        }
+    }
+}
+
+struct RootView: View {
+    @EnvironmentObject var store: Store
+    @Environment(\.scenePhase) private var phase
+    /// 본문은 즉시 바뀌고, 탭바의 선택 표시만 부드럽게 움직인다
+    @State private var tab: Tab = .home
+    @State private var barTab: Tab = .home
+    @State private var sheet: EditorSheet?
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Group {
+                switch tab {
+                case .home: HomeView(sheet: $sheet)
+                case .timetable: TimetableView(sheet: $sheet)
+                case .calendar: CalendarScreen(sheet: $sheet)
+                case .settings: SettingsView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            TabBar(selected: barTab) { t in
+                tab = t
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) { barTab = t }
+            }
+            .padding(.bottom, 2)
+        }
+        .sheet(item: $sheet) { s in
+            switch s {
+            case .schedule(let item, let isNew):
+                ScheduleEditor(item: item, isNew: isNew)
+                    .environmentObject(store)
+            case .todo(let todo, let isNew):
+                TodoEditor(todo: todo, isNew: isNew)
+                    .environmentObject(store)
+                    .presentationDetents([.medium, .large])
+            }
+        }
+        .preferredColorScheme(store.settings.theme.scheme)
+        .task {
+            _ = await NotificationScheduler.shared.requestAuthorization()
+            store.reschedule()
+        }
+        .onChange(of: phase) { _, newPhase in
+            if newPhase == .active { store.reschedule() }
+        }
+        .alert("저장 오류", isPresented: Binding(get: { store.lastError != nil },
+                                              set: { if !$0 { store.lastError = nil } })) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(store.lastError ?? "")
+        }
+    }
+}

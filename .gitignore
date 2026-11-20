@@ -1,0 +1,14 @@
+# XcodeGen이 만드는 파일 (project.yml이 원본)
+Dayline.xcodeproj/
+Dayline/Info.plist
+
+# 빌드 결과물
+build/
+Payload/
+*.ipa
+source.json
+notes.txt
+xcodebuild.log
+
+.DS_Store
+xcuserdata/
