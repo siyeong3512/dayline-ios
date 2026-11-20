@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreTransferable
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 import UserNotifications
@@ -21,6 +22,7 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var notice: String?
     @State private var speaker = AVSpeechSynthesizer()
+    @State private var photoItem: PhotosPickerItem?
 
     private let sample = ScheduleItem(id: "sample", kind: .timetable, title: "자료구조", place: "K501",
                                       time: "14:00", weekdays: [1], reminders: [30])
@@ -51,6 +53,18 @@ struct SettingsView: View {
             }
             .task { await refresh() }
             .onChange(of: phase) { _, p in if p == .active { Task { await refresh() } } }
+            .onChange(of: photoItem) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let jpeg = AvatarImage.prepare(data) {
+                        store.setAvatar(jpeg)
+                    } else {
+                        notice = "사진을 불러오지 못했어요. 다른 사진으로 해보세요."
+                    }
+                    photoItem = nil
+                }
+            }
         }
     }
 
@@ -119,8 +133,30 @@ struct SettingsView: View {
                 }
             }
             .padding(.vertical, 2)
+            if store.settings.effectiveTone == .custom {
+                NotificationPreview(title: Nag.title(settings: store.settings, item: sample),
+                                    message: Nag.body(settings: store.settings, item: sample, minutesBefore: 30),
+                                    showsPhoto: store.hasAvatar,
+                                    version: store.avatarVersion)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            }
             if let custom = store.settings.customTone {
                 LabeledContent(custom.name, value: "문장 \(custom.count)개")
+                if let sender = custom.sender {
+                    LabeledContent("보낸 사람(알림 제목)", value: sender)
+                }
+                HStack(spacing: 12) {
+                    AvatarView(version: store.avatarVersion, size: 40)
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        Text(store.hasAvatar ? "프로필 사진 바꾸기" : "프로필 사진 고르기")
+                    }
+                    Spacer()
+                    if store.hasAvatar {
+                        Button("지우기", role: .destructive) { store.setAvatar(nil) }
+                            .buttonStyle(.borderless)
+                    }
+                }
                 Button("나만의 말투 지우기", role: .destructive) {
                     if store.settings.tone == .custom { store.settings.tone = .friend }
                     store.settings.customTone = nil
@@ -135,7 +171,7 @@ struct SettingsView: View {
         } header: {
             Text("잔소리")
         } footer: {
-            Text("나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 문장은 이 아이폰 안에만 저장돼요.")
+            Text("나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 보낸 사람 이름이 있으면 알림 제목이 그 이름이 되고, 프로필 사진은 알림 오른쪽에 붙어요. 문장과 사진은 이 아이폰 안에만 저장돼요.")
         }
     }
 

@@ -252,6 +252,8 @@ enum NagTone: String, Codable, CaseIterable, Identifiable {
 /// 문장 안의 {title} {left} {place} {time}은 일정 정보로 바뀐다.
 struct CustomTone: Codable, Equatable {
     var name: String
+    /// 알림 제목에 보낸 사람처럼 표시할 이름(없으면 일정 이름이 제목)
+    var sender: String?
     /// 2시간 이상 전
     var early: [String]
     /// 30분~1시간 전
@@ -259,10 +261,11 @@ struct CustomTone: Codable, Equatable {
     /// 10분 전
     var urgent: [String]
 
-    enum CodingKeys: String, CodingKey { case name, early, soon, urgent }
+    enum CodingKeys: String, CodingKey { case name, sender, early, soon, urgent }
 
-    init(name: String, early: [String], soon: [String], urgent: [String]) {
+    init(name: String, sender: String? = nil, early: [String], soon: [String], urgent: [String]) {
         self.name = name
+        self.sender = sender
         self.early = early
         self.soon = soon
         self.urgent = urgent
@@ -271,6 +274,8 @@ struct CustomTone: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = (try? c.decode(String.self, forKey: .name)) ?? "나만의 말투"
+        let rawSender = ((try? c.decode(String.self, forKey: .sender)) ?? "").trimmingCharacters(in: .whitespaces)
+        sender = rawSender.isEmpty ? nil : rawSender
         early = ((try? c.decode([String].self, forKey: .early)) ?? []).filter { !$0.isEmpty }
         soon = ((try? c.decode([String].self, forKey: .soon)) ?? []).filter { !$0.isEmpty }
         urgent = ((try? c.decode([String].self, forKey: .urgent)) ?? []).filter { !$0.isEmpty }

@@ -89,10 +89,11 @@ actor NotificationScheduler {
 
         for p in list {
             let content = UNMutableNotificationContent()
-            content.title = p.item.title
+            content.title = Nag.title(settings: settings, item: p.item)
             content.body = Nag.body(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
-            content.threadIdentifier = p.item.id
+            content.threadIdentifier = Nag.sender(settings: settings).map { "sender-" + $0 } ?? p.item.id
             content.sound = .default
+            if let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
             if settings.voiceEnabled {
                 let text = Nag.spoken(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
                 if let name = await voice.soundFile(text: text, voiceID: settings.voiceID) {
@@ -111,14 +112,32 @@ actor NotificationScheduler {
         voice.cleanup(keeping: usedSounds)
     }
 
+    /// 나만의 말투 + 프로필 사진이 있으면 알림 오른쪽에 사진을 붙인다.
+    /// iOS가 첨부 파일을 옮겨 가므로 알림마다 복사본을 만든다.
+    static func avatarAttachment(settings: AppSettings) -> UNNotificationAttachment? {
+        guard settings.effectiveTone == .custom else { return nil }
+        let fm = FileManager.default
+        let source = Store.avatarURL
+        guard fm.fileExists(atPath: source.path) else { return nil }
+        let copy = fm.temporaryDirectory.appendingPathComponent("avatar-\(UUID().uuidString).jpg")
+        do {
+            try fm.copyItem(at: source, to: copy)
+            return try UNNotificationAttachment(identifier: "avatar", url: copy, options: nil)
+        } catch {
+            try? fm.removeItem(at: copy)
+            return nil
+        }
+    }
+
     /// 5초 뒤 테스트 알림
     func sendTest(settings: AppSettings) async {
         let sample = ScheduleItem(id: "test", kind: .event, title: "자료구조", place: "K501",
                                   time: Day.clock(Day.minutesOfDay(Date()) + 30), reminders: [30])
         let content = UNMutableNotificationContent()
-        content.title = sample.title
+        content.title = Nag.title(settings: settings, item: sample)
         content.body = Nag.body(settings: settings, item: sample, minutesBefore: 30)
         content.sound = .default
+        if let photo = Self.avatarAttachment(settings: settings) { content.attachments = [photo] }
         if settings.voiceEnabled,
            let name = await voice.soundFile(text: Nag.spoken(settings: settings, item: sample, minutesBefore: 30),
                                             voiceID: settings.voiceID) {

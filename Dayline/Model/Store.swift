@@ -229,6 +229,31 @@ final class Store: ObservableObject {
         save()
     }
 
+    // MARK: 프로필 사진 (나만의 말투의 보낸 사람 사진, 기기 안에만 저장)
+
+    static var avatarURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Dayline", isDirectory: true)
+            .appendingPathComponent("avatar.jpg")
+    }
+
+    @Published private(set) var avatarVersion = 0
+
+    var hasAvatar: Bool { FileManager.default.fileExists(atPath: Self.avatarURL.path) }
+
+    func setAvatar(_ data: Data?) {
+        if let data {
+            do { try data.write(to: Self.avatarURL, options: [.atomic]) } catch {
+                lastError = "사진을 저장하지 못했어요: \(error.localizedDescription)"
+                return
+            }
+        } else {
+            try? FileManager.default.removeItem(at: Self.avatarURL)
+        }
+        avatarVersion += 1
+        reschedule()
+    }
+
     // MARK: 알림
 
     private func commit() {

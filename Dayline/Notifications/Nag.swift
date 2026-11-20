@@ -16,11 +16,23 @@ enum Nag {
             .replacingOccurrences(of: "{time}", with: item.time)
     }
 
-    /// 알림 본문: 잔소리 + 시간·장소
+    /// 보낸 사람 이름이 있는 말투면 그 이름, 아니면 nil
+    static func sender(settings: AppSettings) -> String? {
+        settings.effectiveTone == .custom ? settings.customTone?.sender : nil
+    }
+
+    /// 알림 제목: 보낸 사람이 있으면 그 사람 이름(톡처럼), 없으면 일정 이름
+    static func title(settings: AppSettings, item: ScheduleItem) -> String {
+        sender(settings: settings) ?? item.title
+    }
+
+    /// 알림 본문: 잔소리 + (일정 이름) + 시간·장소
     static func body(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int) -> String {
         let info = item.place.isEmpty ? item.time : "\(item.time) · \(item.place)"
         if settings.effectiveTone == .plain { return "\(ReminderOption.label(n)) · \(info)" }
-        return line(settings: settings, item: item, minutesBefore: n) + "\n" + info
+        let text = line(settings: settings, item: item, minutesBefore: n)
+        if sender(settings: settings) != nil { return text + "\n" + item.title + " · " + info }
+        return text + "\n" + info
     }
 
     /// 목소리로 읽을 문장 (ㅋㅋ·ㅏ·이모지처럼 TTS가 이상하게 읽는 글자는 뺀다)
