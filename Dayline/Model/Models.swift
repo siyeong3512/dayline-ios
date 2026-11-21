@@ -336,6 +336,19 @@ struct Person: Codable, Identifiable, Hashable {
     var name: String
     var tone: NagTone?
     var customTone: CustomTone?
+    /// 잠금화면 카드·다이내믹 아일랜드 색 (PersonColor.hex 중 하나, nil이면 기본 라벤더)
+    var colorHex: String?
+}
+
+/// 보낸 사람 색: 라벤더 계열 16가지
+enum PersonColor {
+    static let all: [(hex: String, name: String)] = [
+        ("7B5CE6", "라벤더"), ("9B7BEA", "라일락"), ("B39DF5", "연보라"), ("6C47D9", "퍼플"),
+        ("5432B8", "딥퍼플"), ("8E4FE0", "바이올렛"), ("B05CD6", "오키드"), ("C77DD8", "매그놀리아"),
+        ("9A4FB5", "플럼"), ("A77BB8", "모브"), ("D184C8", "핑크 라벤더"), ("C76BA6", "로즈 라일락"),
+        ("6F7CEB", "페리윙클"), ("7C8CF0", "블루 라벤더"), ("5250D6", "인디고"), ("9C93C8", "그레이 라벤더")
+    ]
+    static let defaultHex = "7B5CE6"
 }
 
 /// '못 했어'로 연장한 마감

@@ -33,7 +33,7 @@ struct NextUpLiveActivity: Widget {
         ActivityConfiguration(for: NextUpAttributes.self) { context in
             NextUpLockScreen(state: context.state, started: context.isStale || context.state.start <= Date())
                 .activityBackgroundTint(CardStyle.base)
-                .activitySystemActionForegroundColor(CardStyle.accent)
+                .activitySystemActionForegroundColor(CardStyle.accent(context.state))
         } dynamicIsland: { context in
             let s = context.state
             return DynamicIsland {
@@ -54,7 +54,7 @@ struct NextUpLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     Countdown(state: s)
                         .font(.title3.weight(.bold))
-                        .foregroundStyle(WidgetTheme.accent)
+                        .foregroundStyle(CardStyle.accent(s))
                         .frame(maxWidth: 84, alignment: .trailing)
                         .padding(.top, 8)
                 }
@@ -72,11 +72,12 @@ struct NextUpLiveActivity: Widget {
             } compactTrailing: {
                 Countdown(state: s)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(WidgetTheme.accent)
+                    .foregroundStyle(CardStyle.accent(s))
                     .frame(maxWidth: 52)
             } minimal: {
                 Face(state: s, size: 24)
             }
+            .keylineTint(CardStyle.accent(s))
         }
     }
 }
@@ -114,7 +115,7 @@ struct Face: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(CardStyle.accent, lineWidth: size >= 40 ? 2 : 1.5))
+        .overlay(Circle().strokeBorder(CardStyle.accent(state), lineWidth: size >= 40 ? 2 : 1.5))
     }
 }
 
@@ -136,16 +137,31 @@ enum CardStyle {
               blue: Double(v & 0xff) / 255, opacity: a)
     }
     static let base = hex(0x16131F)
-    static let accent = hex(0xB6A3FF)
     static let text = hex(0xF7F5FF)
     static let sub = hex(0xA9A3BD)
     static let bubble = Color.white.opacity(0.08)
 
-    static var background: some View {
+    /// 보낸 사람 색 (rgb 0~1)
+    private static func rgb(_ s: NextUpAttributes.ContentState) -> (Double, Double, Double) {
+        let v = UInt64(s.accentHex ?? "7B5CE6", radix: 16) ?? 0x7B5CE6
+        return (Double((v >> 16) & 0xff) / 255, Double((v >> 8) & 0xff) / 255, Double(v & 0xff) / 255)
+    }
+
+    /// 색을 흰색(t>0) 또는 검정(t<0) 쪽으로 섞는다
+    private static func mix(_ s: NextUpAttributes.ContentState, _ t: Double, _ a: Double = 1) -> Color {
+        let (r, g, b) = rgb(s)
+        func f(_ c: Double) -> Double { t >= 0 ? c + (1 - c) * t : c * (1 + t) }
+        return Color(red: f(r), green: f(g), blue: f(b), opacity: a)
+    }
+
+    /// 짙은 카드 위에서 잘 보이게 밝힌 글씨·숫자 색
+    static func accent(_ s: NextUpAttributes.ContentState) -> Color { mix(s, 0.38) }
+
+    static func background(_ s: NextUpAttributes.ContentState) -> some View {
         ZStack {
-            LinearGradient(colors: [hex(0x2E2550), hex(0x17142A), hex(0x100E17)],
+            LinearGradient(colors: [mix(s, -0.62), mix(s, -0.82), hex(0x100E17)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            RadialGradient(colors: [hex(0x8C6CF5, 0.42), .clear],
+            RadialGradient(colors: [mix(s, 0.05, 0.42), .clear],
                            center: .topTrailing, startRadius: 0, endRadius: 190)
         }
     }
@@ -187,10 +203,10 @@ struct NextUpLockScreen: View {
         }
         .padding(.horizontal, 15)
         .padding(.vertical, 13)
-        .background(CardStyle.background)
+        .background(CardStyle.background(state))
         .overlay(
             ContainerRelativeShape()
-                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.22), CardStyle.accent.opacity(0.18), Color.white.opacity(0.04)],
+                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.22), CardStyle.accent(state).opacity(0.18), Color.white.opacity(0.04)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
         )
     }
@@ -200,16 +216,16 @@ struct NextUpLockScreen: View {
         if state.result == "done" {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(CardStyle.accent)
+                .foregroundStyle(CardStyle.accent(state))
         } else if started {
             Text("시간 됐어")
                 .font(.system(size: 15.5, weight: .bold))
-                .foregroundStyle(CardStyle.accent)
+                .foregroundStyle(CardStyle.accent(state))
         } else {
             VStack(alignment: .trailing, spacing: -3) {
                 Countdown(state: state)
                     .font(.system(size: longForm ? 36 : 44, weight: .heavy, design: .rounded))
-                    .foregroundStyle(CardStyle.accent)
+                    .foregroundStyle(CardStyle.accent(state))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .frame(width: longForm ? 146 : 122, alignment: .trailing)
@@ -236,7 +252,7 @@ struct NextUpLockScreen: View {
                         .foregroundStyle(CardStyle.base)
                         .padding(.horizontal, 16)
                         .frame(height: 34)
-                        .background(Capsule().fill(CardStyle.accent))
+                        .background(Capsule().fill(CardStyle.accent(state)))
                 }
                 .buttonStyle(.plain)
                 Link(destination: extendURL) {
@@ -250,7 +266,7 @@ struct NextUpLockScreen: View {
             }
         } else if let line = state.line {
             bubble(
-                Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 14.5, weight: .bold)).foregroundColor(CardStyle.accent)
+                Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 14.5, weight: .bold)).foregroundColor(CardStyle.accent(state))
                     + Text(line).font(.system(size: 14.5)).foregroundColor(CardStyle.text)
             )
         }

@@ -89,7 +89,8 @@ enum LiveActivityManager {
             line: line,
             avatar: avatarURL.flatMap { AvatarImage.thumbnail(from: $0) },
             avatarKey: avatarURL.flatMap { shareAvatar($0, personID: settings.activePersonID ?? "x") },
-            result: nil)
+            result: nil,
+            accentHex: settings.activePerson?.colorHex)
     }
 
     /// 고화질 사진을 공유 폴더에 복사하고 파일 키를 돌려준다(이미 있으면 그대로)

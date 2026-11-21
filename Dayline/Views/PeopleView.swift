@@ -36,7 +36,7 @@ struct PeopleView: View {
                         } label: {
                             HStack(spacing: 14) {
                                 AvatarView(personID: p.id, version: store.avatarVersion, size: 44)
-                                    .overlay(Circle().strokeBorder(store.settings.activePersonID == p.id ? Theme.accent : Color.clear, lineWidth: 2))
+                                    .overlay(Circle().strokeBorder(Color(hex: p.colorHex ?? PersonColor.defaultHex), lineWidth: 2.5))
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(p.name).font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
                                     Text("말투: " + PersonToneView.label(p, settings: store.settings))
@@ -127,6 +127,13 @@ struct PersonEditor: View {
                 }
                 Section {
                     TextField("이름 (알림 제목에 떠요)", text: $person.name)
+                }
+                Section {
+                    PersonColorGrid(selection: $person.colorHex)
+                } header: {
+                    Text("카드 색")
+                } footer: {
+                    Text("이 사람을 고르면 잠금화면 카드와 다이내믹 아일랜드가 이 색으로 바뀌어요.")
                 }
                 Section {
                     NavigationLink {
@@ -317,5 +324,38 @@ struct PersonToneView: View {
             person.tone = .custom
             notice = "‘\(tone.name)’ 말투를 가져왔어요 (문장 \(tone.count)개). 저장을 눌러야 반영돼요."
         }
+    }
+}
+
+/// 라벤더 계열 16색 중 하나 고르기
+struct PersonColorGrid: View {
+    @Binding var selection: String?
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 8)
+
+    var body: some View {
+        let current = selection ?? PersonColor.defaultHex
+        VStack(alignment: .leading, spacing: 10) {
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(PersonColor.all, id: \.hex) { c in
+                    Button { selection = c.hex } label: {
+                        Circle()
+                            .fill(Color(hex: c.hex))
+                            .frame(height: 30)
+                            .overlay {
+                                if current == c.hex {
+                                    Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                                }
+                            }
+                            .overlay(Circle().strokeBorder(Theme.text.opacity(current == c.hex ? 0.35 : 0), lineWidth: 2).padding(-3))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(c.name)
+                }
+            }
+            Text(PersonColor.all.first { $0.hex == current }?.name ?? "")
+                .font(.system(size: 13.5, weight: .medium))
+                .foregroundStyle(Theme.faint)
+        }
+        .padding(.vertical, 6)
     }
 }
