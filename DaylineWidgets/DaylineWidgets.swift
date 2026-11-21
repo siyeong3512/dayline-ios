@@ -273,16 +273,26 @@ struct NextUpLockScreen: View {
             }
         } else if let line = state.line {
             let duo = state.cameoLine != nil
-            // 끼어들 때는 메인 말풍선을 끼어든 말풍선 시작 위치에 맞춘다 (14 + 사진 22 + 간격 7)
+            // 끼어들 때: 왼쪽 22pt 칸에 (메인) 말풍선 아이콘 / (끼어든 사람) 작은 사진, 두 말풍선 시작 위치를 맞춘다
             VStack(alignment: .leading, spacing: 5) {
-                message(name: state.sender, line: line, color: CardStyle.accent(state), small: duo)
-                    .padding(.leading, duo ? 43 : 0)
+                if duo {
+                    HStack(alignment: .center, spacing: 7) {
+                        Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CardStyle.accent(state))
+                            .frame(width: 22)
+                        message(name: state.sender, line: line, color: CardStyle.accent(state), small: true)
+                    }
+                    .padding(.leading, 4)
+                } else {
+                    message(name: state.sender, line: line, color: CardStyle.accent(state), small: false)
+                }
                 if let cameo = state.cameoLine {
                     HStack(alignment: .center, spacing: 7) {
                         MiniFace(key: state.cameoAvatarKey, name: state.cameoName ?? "", color: CardStyle.accent(hex: state.cameoHex))
                         message(name: state.cameoName, line: cameo, color: CardStyle.accent(hex: state.cameoHex), small: true)
                     }
-                    .padding(.leading, 14)
+                    .padding(.leading, 4)
                 }
             }
         }
