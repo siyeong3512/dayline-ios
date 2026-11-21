@@ -87,11 +87,18 @@ struct Face: View {
     let state: NextUpAttributes.ContentState
     let size: CGFloat
 
+    /// 다이내믹 아일랜드처럼 작은 자리는 데이터에 실린 썸네일로 충분하고,
+    /// 큰 자리만 공유 폴더 사진을 '보이는 크기 그대로' 줄여서 쓴다.
+    /// (큰 원본을 그대로 넘기면 메모리 제한 때문에 빈 동그라미로 그려질 수 있다)
     private var image: UIImage? {
+        let pixels = CGSize(width: size * 3, height: size * 3)
+        let thumb = state.avatar.flatMap { UIImage(data: $0) }
+        if size < 40, let thumb { return thumb.preparingThumbnail(of: pixels) ?? thumb }
         if let key = state.avatarKey, let url = NextUpAttributes.avatarFile(key),
-           let img = UIImage(contentsOfFile: url.path) { return img }
-        if let data = state.avatar { return UIImage(data: data) }
-        return nil
+           let img = UIImage(contentsOfFile: url.path), let small = img.preparingThumbnail(of: pixels) {
+            return small
+        }
+        return thumb.map { $0.preparingThumbnail(of: pixels) ?? $0 }
     }
 
     var body: some View {

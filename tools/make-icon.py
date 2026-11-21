@@ -73,5 +73,17 @@ def make(name, bg, bubble, sparkle):
     print("wrote", OUT / name)
 
 
+def make_dark(name, bubble):
+    """다크 모드 아이콘: 배경은 투명(iOS가 다른 앱과 같은 검정 바탕을 깔아 줌), 반짝이는 뚫어서 바탕이 비치게."""
+    n = SIZE * SS
+    img = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    bubble_mask = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(bubble_mask).polygon(BUBBLE, fill=255)
+    ImageDraw.Draw(bubble_mask).polygon(SPARKLE, fill=0)
+    img.paste(gradient(hexrgb(bubble[0]), hexrgb(bubble[1])).convert("RGBA"), (0, 0), bubble_mask)
+    img.resize((SIZE, SIZE), Image.LANCZOS).save(OUT / name)
+    print("wrote", OUT / name)
+
+
 make("icon-light.png", bg=("9A80F4", "4B2FB3"), bubble=("FFFFFF", "EEE8FF"), sparkle=("B19BF7", "5E3FD2"))
-make("icon-dark.png", bg=("2C2546", "100D18"), bubble=("C2B2FA", "8A6EEA"), sparkle=("2A2247", "15111F"))
+make_dark("icon-dark.png", bubble=("CDBEFF", "8466EC"))
