@@ -305,7 +305,7 @@ final class Store: ObservableObject {
         guard settings.people.isEmpty else { return }
         let fm = FileManager.default
         let hasLegacyPhoto = fm.fileExists(atPath: Self.legacyAvatarURL.path)
-        let legacyName = settings.customTone?.sender
+        let legacyName = settings.toneLibrary.first(where: { $0.sender != nil })?.sender
         guard hasLegacyPhoto || legacyName != nil else { return }
         let person = Person(name: legacyName ?? "보낸 사람")
         if hasLegacyPhoto {
@@ -316,8 +316,55 @@ final class Store: ObservableObject {
         var s = settings
         s.people = [person]
         s.activePersonID = person.id
-        s.customTone?.sender = nil
+        for i in s.toneLibrary.indices { s.toneLibrary[i].sender = nil }
         settings = s
+    }
+
+    // MARK: 말투 보관함
+
+    /// 보관함에 넣는다. 같은 이름이 있으면 새 문장으로 바꾼다(쓰던 곳은 그대로)
+    @discardableResult
+    func addTone(_ tone: CustomTone) -> CustomTone {
+        var t = tone
+        t.sender = nil
+        var s = settings
+        if let i = s.toneLibrary.firstIndex(where: { $0.name == t.name }) {
+            t.id = s.toneLibrary[i].id
+            s.toneLibrary[i] = t
+        } else {
+            s.toneLibrary.append(t)
+        }
+        settings = s
+        return t
+    }
+
+    func renameTone(_ id: String, to name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, let i = settings.toneLibrary.firstIndex(where: { $0.id == id }) else { return }
+        settings.toneLibrary[i].name = name
+    }
+
+    /// 지우면 이 말투를 쓰던 곳은 기본값으로 돌아간다
+    func deleteTone(_ id: String) {
+        var s = settings
+        s.toneLibrary.removeAll { $0.id == id }
+        if s.customToneID == id {
+            s.customToneID = nil
+            if s.tone == .custom { s.tone = .friend }
+        }
+        for i in s.people.indices where s.people[i].customToneID == id {
+            s.people[i].customToneID = nil
+            if s.people[i].tone == .custom { s.people[i].tone = nil }
+        }
+        settings = s
+    }
+
+    /// 이 말투를 쓰는 곳 ("기본", 사람 이름)
+    func toneUsers(_ id: String) -> [String] {
+        var out: [String] = []
+        if settings.tone == .custom && settings.customToneID == id { out.append("기본") }
+        out += settings.people.filter { $0.tone == .custom && $0.customToneID == id }.map(\.name)
+        return out
     }
 
     // MARK: 알림

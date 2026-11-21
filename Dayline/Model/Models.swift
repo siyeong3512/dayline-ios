@@ -250,7 +250,9 @@ enum NagTone: String, Codable, CaseIterable, Identifiable {
 
 /// 사용자가 파일로 가져오는 말투. 앱 안(설정 파일)에만 저장되고 코드·저장소에는 들어가지 않는다.
 /// 문장 안의 {title} {left} {place} {time}은 일정 정보로 바뀐다.
-struct CustomTone: Codable, Hashable {
+struct CustomTone: Codable, Hashable, Identifiable {
+    /// 보관함 안에서 구분하는 값 (파일에는 없어도 됨)
+    var id: String = UUID().uuidString
     var name: String
     /// 알림 제목에 보낸 사람처럼 표시할 이름(없으면 일정 이름이 제목)
     var sender: String?
@@ -263,7 +265,7 @@ struct CustomTone: Codable, Hashable {
     /// 할 일 체크 알림 ({period} {count} 사용)
     var todo: [String]
 
-    enum CodingKeys: String, CodingKey { case name, sender, early, soon, urgent, todo }
+    enum CodingKeys: String, CodingKey { case id, name, sender, early, soon, urgent, todo }
 
     init(name: String, sender: String? = nil, early: [String], soon: [String], urgent: [String], todo: [String] = []) {
         self.name = name
@@ -276,6 +278,7 @@ struct CustomTone: Codable, Hashable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
         name = (try? c.decode(String.self, forKey: .name)) ?? "나만의 말투"
         let rawSender = ((try? c.decode(String.self, forKey: .sender)) ?? "").trimmingCharacters(in: .whitespaces)
         sender = rawSender.isEmpty ? nil : rawSender
@@ -335,6 +338,9 @@ struct Person: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var name: String
     var tone: NagTone?
+    /// tone이 .custom일 때 쓰는 보관함 말투 id
+    var customToneID: String?
+    /// 옛 버전에서 사람마다 넣던 말투 (보관함으로 옮긴 뒤 비움)
     var customTone: CustomTone?
     /// 잠금화면 카드·다이내믹 아일랜드 색 (PersonColor.hex 중 하나, nil이면 기본 라벤더)
     var colorHex: String?
@@ -376,12 +382,16 @@ struct AppSettings: Codable, Equatable {
     var todoCheckMinutes = 21 * 60
     /// 연장 중인 일정
     var extended: Extension?
+    /// 가져온 말투들
+    var toneLibrary: [CustomTone] = []
+    /// 기본 말투가 .custom일 때 쓰는 보관함 말투 id
+    var customToneID: String?
 
     init() {}
 
     enum CodingKeys: String, CodingKey {
         case tone, voiceEnabled, voiceID, theme, customTone, chatStyle, liveActivity
-        case people, activePersonID, todoCheck, todoCheckMinutes, extended
+        case people, activePersonID, todoCheck, todoCheckMinutes, extended, toneLibrary, customToneID
     }
 
     var activePerson: Person? {
@@ -404,12 +414,42 @@ struct AppSettings: Codable, Equatable {
         let rawMinutes = (try? c.decode(Int.self, forKey: .todoCheckMinutes)) ?? 21 * 60
         todoCheckMinutes = min(max(rawMinutes, 0), 1439)
         extended = try? c.decode(Extension.self, forKey: .extended)
+        toneLibrary = (try? c.decode([CustomTone].self, forKey: .toneLibrary)) ?? []
+        customToneID = try? c.decode(String.self, forKey: .customToneID)
+        migrateToLibrary()
     }
 
     /// 지금 쓰는 말투: 고른 사람에게 따로 정한 말투가 있으면 그것, 없으면 기본 말투
     var currentTone: NagTone { activePerson?.tone ?? tone }
     /// 지금 쓰는 나만의 말투 파일
-    var currentCustom: CustomTone? { activePerson?.tone != nil ? activePerson?.customTone : customTone }
+    var currentCustom: CustomTone? {
+        if let p = activePerson, p.tone != nil { return libraryTone(p.customToneID) }
+        return libraryTone(customToneID)
+    }
+
+    func libraryTone(_ id: String?) -> CustomTone? {
+        guard let id else { return nil }
+        return toneLibrary.first { $0.id == id }
+    }
+
+    /// 옛 버전의 말투 하나(기본·사람별)를 보관함으로 옮긴다
+    private mutating func migrateToLibrary() {
+        if let t = customTone {
+            if !toneLibrary.contains(where: { $0.id == t.id }) { toneLibrary.append(t) }
+            if customToneID == nil { customToneID = t.id }
+            customTone = nil
+        }
+        for i in people.indices {
+            guard let t = people[i].customTone else { continue }
+            if let same = toneLibrary.first(where: { $0.name == t.name && $0.count == t.count }) {
+                people[i].customToneID = same.id
+            } else {
+                toneLibrary.append(t)
+                people[i].customToneID = t.id
+            }
+            people[i].customTone = nil
+        }
+    }
 
     /// 나만의 말투를 골랐는데 파일이 없으면 '친구처럼'으로
     var effectiveTone: NagTone {

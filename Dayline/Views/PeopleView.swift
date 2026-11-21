@@ -223,11 +223,11 @@ struct PersonToneView: View {
 
     static func label(_ p: Person, settings: AppSettings) -> String {
         guard let t = p.tone else { return "기본 말투 (\(defaultLabel(settings)))" }
-        return t == .custom ? (p.customTone?.name ?? t.label) : t.label
+        return t == .custom ? (settings.libraryTone(p.customToneID)?.name ?? t.label) : t.label
     }
 
     static func defaultLabel(_ s: AppSettings) -> String {
-        s.tone == .custom ? (s.customTone?.name ?? s.tone.label) : s.tone.label
+        s.tone == .custom ? (s.libraryTone(s.customToneID)?.name ?? s.tone.label) : s.tone.label
     }
 
     /// 이 사람이 보내는 걸로 가정한 설정(미리보기용)
@@ -245,9 +245,18 @@ struct PersonToneView: View {
                 ForEach([NagTone.plain, .gentle, .friend, .strict]) { t in
                     row(t, t.label, sub: nil)
                 }
-                if let c = person.customTone {
-                    row(.custom, c.name, sub: "이 사람 전용 · 문장 \(c.count)개")
+            }
+
+            Section {
+                if store.settings.toneLibrary.isEmpty {
+                    Text("보관함이 비어 있어요. 아래에서 말투 파일을 가져오세요.")
+                        .font(.subheadline).foregroundStyle(Theme.faint)
                 }
+                ForEach(store.settings.toneLibrary) { c in
+                    customRow(c)
+                }
+            } header: {
+                Text("나만의 말투")
             }
 
             Section("미리보기") {
@@ -264,16 +273,15 @@ struct PersonToneView: View {
                 Button {
                     importing = true
                 } label: {
-                    Label(person.customTone == nil ? "이 사람 전용 말투 가져오기" : "전용 말투 바꾸기", systemImage: "text.bubble")
+                    Label("말투 파일 가져오기", systemImage: "square.and.arrow.down")
                 }
-                if person.customTone != nil {
-                    Button("전용 말투 지우기", role: .destructive) {
-                        if person.tone == .custom { person.tone = nil }
-                        person.customTone = nil
-                    }
+                NavigationLink {
+                    ToneLibraryView()
+                } label: {
+                    Label("말투 보관함 관리", systemImage: "text.bubble")
                 }
             } footer: {
-                Text("말투 파일(dayline-tone)을 가져오면 이 사람만 그 말투로 말해요. 파일은 이 아이폰 안에만 저장돼요.")
+                Text("가져온 말투는 보관함에 쌓여서 다른 사람도 골라 쓸 수 있어요. 파일은 이 아이폰 안에만 저장돼요.")
             }
         }
         .navigationTitle(person.name.isEmpty ? "말투" : "\(person.name)의 말투")
@@ -307,6 +315,27 @@ struct PersonToneView: View {
         .buttonStyle(.plain)
     }
 
+    private func customRow(_ c: CustomTone) -> some View {
+        let on = person.tone == .custom && person.customToneID == c.id
+        return Button {
+            person.tone = .custom
+            person.customToneID = c.id
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(c.name).foregroundStyle(Theme.text)
+                    Text("문장 \(c.count)개").font(.caption).foregroundStyle(Theme.faint)
+                }
+                Spacer()
+                if on {
+                    Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private func importTone(_ result: Result<URL, Error>) {
         switch result {
         case .failure(let e):
@@ -320,9 +349,10 @@ struct PersonToneView: View {
             }
             if person.name.trimmingCharacters(in: .whitespaces).isEmpty, let name = tone.sender { person.name = name }
             tone.sender = nil
-            person.customTone = tone
+            let added = store.addTone(tone)
             person.tone = .custom
-            notice = "‘\(tone.name)’ 말투를 가져왔어요 (문장 \(tone.count)개). 저장을 눌러야 반영돼요."
+            person.customToneID = added.id
+            notice = "‘\(added.name)’ 말투를 보관함에 넣고 이 사람 말투로 골랐어요 (문장 \(added.count)개). 저장을 눌러야 반영돼요."
         }
     }
 }

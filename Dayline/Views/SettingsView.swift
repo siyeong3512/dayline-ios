@@ -29,6 +29,23 @@ struct SettingsView: View {
                 set: { store.settings.todoCheckMinutes = Day.minutesOfDay($0) })
     }
 
+    /// 기본 말투 고르기: "b:friend"(기본 제공) 또는 "c:<보관함 id>"
+    private var toneChoice: Binding<String> {
+        Binding(get: {
+            let s = store.settings
+            return s.tone == .custom ? "c:" + (s.customToneID ?? "") : "b:" + s.tone.rawValue
+        }, set: { v in
+            var s = store.settings
+            if v.hasPrefix("c:") {
+                s.tone = .custom
+                s.customToneID = String(v.dropFirst(2))
+            } else {
+                s.tone = NagTone(rawValue: String(v.dropFirst(2))) ?? .friend
+            }
+            store.settings = s
+        })
+    }
+
     private let sample = ScheduleItem(id: "sample", kind: .timetable, title: "자료구조", place: "K501",
                                       time: "14:00", weekdays: [1], reminders: [30])
 
@@ -160,9 +177,12 @@ struct SettingsView: View {
 
     private var toneSection: some View {
         Section {
-            Picker("기본 말투", selection: $store.settings.tone) {
-                ForEach(NagTone.allCases.filter { $0 != .custom || store.settings.customTone != nil }) { t in
-                    Text(t == .custom ? (store.settings.customTone?.name ?? t.label) : t.label).tag(t)
+            Picker("기본 말투", selection: toneChoice) {
+                ForEach([NagTone.plain, .gentle, .friend, .strict]) { t in
+                    Text(t.label).tag("b:" + t.rawValue)
+                }
+                ForEach(store.settings.toneLibrary) { t in
+                    Text(t.name).tag("c:" + t.id)
                 }
             }
             if let p = store.settings.activePerson, p.tone != nil {
@@ -214,23 +234,19 @@ struct SettingsView: View {
                 .disabled(!NotificationScheduler.chatSupported)
             }
 
-            if let custom = store.settings.customTone {
-                LabeledContent(custom.name, value: "문장 \(custom.count)개")
-                Button("나만의 말투 지우기", role: .destructive) {
-                    if store.settings.tone == .custom { store.settings.tone = .friend }
-                    store.settings.customTone = nil
-                }
-            }
-            Button {
-                importing = true
+            NavigationLink {
+                ToneLibraryView()
             } label: {
-                Label(store.settings.customTone == nil ? "나만의 말투 가져오기" : "나만의 말투 바꾸기",
-                      systemImage: "text.bubble")
+                LabeledContent {
+                    Text("\(store.settings.toneLibrary.count)개")
+                } label: {
+                    Label("말투 보관함", systemImage: "text.bubble")
+                }
             }
         } header: {
             Text("잔소리")
         } footer: {
-            Text("기본 말투는 보낸 사람이 없거나, 그 사람에게 말투를 따로 정하지 않았을 때 써요. 보낸 사람마다 말투를 따로 정하려면 보낸 사람 > 수정 > 말투로 가요. 보낸 사람의 이름이 알림 제목이 되고 사진은 알림 오른쪽과 잠금화면 카드에 붙어요. 나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 문장에 을/를, 이/가, (으)로, (이)처럼 쓰면 일정 이름의 받침에 맞게 골라줘요. 문장과 사진은 이 아이폰 안에만 저장돼요.")
+            Text("기본 말투는 보낸 사람이 없거나, 그 사람에게 말투를 따로 정하지 않았을 때 써요. 보낸 사람마다 말투를 따로 정하려면 보낸 사람 > 수정 > 말투로 가요. 보낸 사람의 이름이 알림 제목이 되고 사진은 알림 오른쪽과 잠금화면 카드에 붙어요. 나만의 말투는 말투 보관함에 파일(dayline-tone)을 여러 개 넣어두고 골라 써요. 문장에 을/를, 이/가, (으)로, (이)처럼 쓰면 일정 이름의 받침에 맞게 골라줘요. 문장과 사진은 이 아이폰 안에만 저장돼요.")
         }
     }
 
@@ -308,21 +324,9 @@ struct SettingsView: View {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             do {
                 let data = try Data(contentsOf: url)
-                if var tone = CustomTone.decodeFile(data) {
-                    var s = store.settings
-                    var extra = ""
-                    // 말투 파일에 보낸 사람 이름이 있으면 '보낸 사람' 목록에 추가(이미 있으면 그대로)
-                    if let name = tone.sender, !s.people.contains(where: { $0.name == name }) {
-                        let person = Person(name: name)
-                        s.people.append(person)
-                        if s.activePersonID == nil { s.activePersonID = person.id }
-                        extra = " ‘\(name)’도 보낸 사람 목록에 추가했어요."
-                    }
-                    tone.sender = nil
-                    s.customTone = tone
-                    s.tone = .custom
-                    store.settings = s
-                    notice = "‘\(tone.name)’ 말투를 가져왔어요 (문장 \(tone.count)개)." + extra
+                if let tone = CustomTone.decodeFile(data) {
+                    let added = store.addTone(tone)
+                    notice = "‘\(added.name)’ 말투를 보관함에 넣었어요 (문장 \(added.count)개). 기본 말투나 보낸 사람 > 말투에서 골라 쓰세요."
                     return
                 }
                 let r = try store.importData(data)
