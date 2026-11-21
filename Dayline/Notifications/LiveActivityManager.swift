@@ -117,6 +117,10 @@ enum LiveActivityManager {
                                   pushType: nil)
     }
 
+    /// 앱을 열거나 '지금 띄워보기'를 누를 때마다 올라가는 번호. 카드 문구(와 끼어들기)를 새로 뽑는다.
+    static var reroll: Int { UserDefaults.standard.integer(forKey: "cardReroll") }
+    static func rerollLine() { UserDefaults.standard.set(reroll + 1, forKey: "cardReroll") }
+
     static func makeState(_ x: ScheduleItem, _ when: Date, settings: AppSettings) -> NextUpAttributes.ContentState {
         let timeLabel: String
         if x.kind == .timetable {
@@ -131,7 +135,7 @@ enum LiveActivityManager {
         // 문구는 30분 칸마다 한 번씩 바뀐다 (2:17 남음 → '2시간' 문구, 2:00이 되면 다음 문구는 1:30에)
         let shown = bucket(minutesLeft: minutesLeft)
         lastBucket = shown
-        let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: shown)
+        let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: shown, salt: "|r\(reroll)")
         let avatarURL = Store.activeAvatarURL(settings)
         let extra = line == nil ? nil : cameo(for: x, bucket: shown, settings: settings)
         return NextUpAttributes.ContentState(
@@ -163,13 +167,13 @@ enum LiveActivityManager {
         -> (name: String, line: String, hex: String?, avatarKey: String?)? {
         let others = settings.people.filter { $0.id != settings.activePersonID }
         guard settings.activePerson != nil, !others.isEmpty else { return nil }
-        let seed = "\(x.id)|\(bucket)|cameo"
+        let seed = "\(x.id)|\(bucket)|cameo|r\(reroll)"
         guard Nag.stableHash(seed) % 100 < cameoChance else { return nil }
         let other = others[Int(Nag.stableHash(seed + "|who") % UInt64(others.count))]
         var s = settings
         s.activePersonID = other.id
         guard s.effectiveTone != .plain else { return nil }
-        let line = Nag.line(settings: s, item: x, minutesBefore: bucket, salt: "|cameo")
+        let line = Nag.line(settings: s, item: x, minutesBefore: bucket, salt: "|cameo|r\(reroll)")
         let key = Store.activeAvatarURL(s).flatMap { shareAvatar($0, personID: other.id) }
         return (other.name, line, other.colorHex, key)
     }

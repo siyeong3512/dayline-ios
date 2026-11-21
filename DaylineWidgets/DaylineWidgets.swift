@@ -231,7 +231,7 @@ struct NextUpLockScreen: View {
         } else {
             VStack(alignment: .trailing, spacing: -3) {
                 Countdown(state: state)
-                    .font(.system(size: longForm ? 36 : 44, weight: .heavy, design: .rounded))
+                    .font(.system(size: 36, weight: .heavy, design: .rounded))
                     .foregroundStyle(CardStyle.accent(state))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)

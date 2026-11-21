@@ -162,6 +162,7 @@ struct SettingsView: View {
                     } else if store.upNext() == nil {
                         notice = "다가오는 일정이 없어요. 시간표나 약속을 먼저 추가해 주세요."
                     } else {
+                        LiveActivityManager.rerollLine()
                         LiveActivityManager.refresh(store: store, force: true)
                         notice = "잠금화면과 다이내믹 아일랜드를 확인해 보세요. 안 보이면 SideStore 설치 때 확장 처리 방식을 바꿔야 할 수 있어요."
                     }
