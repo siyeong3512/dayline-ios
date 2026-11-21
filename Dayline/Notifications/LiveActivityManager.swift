@@ -1,4 +1,5 @@
 import ActivityKit
+import BackgroundTasks
 import Foundation
 import UIKit
 
@@ -23,6 +24,58 @@ enum LiveActivityManager {
             next = (item: item, when: e.until)
         }
         Task { await apply(next: next, settings: settings, force: force) }
+        scheduleTick(start: next?.when)
+    }
+
+    // MARK: 30분마다 문구 바꾸기
+
+    static let tickTaskID = "app.dayline.ios.tick"
+
+    /// 남은 시간을 30분 단위로 내림 (30분 미만은 그대로). 이 값이 바뀌면 카드 문구를 새로 고른다.
+    static func bucket(minutesLeft m: Int) -> Int { m >= 30 ? (m / 30) * 30 : m }
+
+    /// 다음 '남은 시간이 30분의 배수'가 되는 시각
+    static func nextBoundary(start: Date, now: Date = Date()) -> Date? {
+        let left = start.timeIntervalSince(now)
+        guard left > 30 * 60 else { return nil }
+        let k = (left / 1800).rounded(.down)
+        let t = start.addingTimeInterval(-k * 1800)
+        return t > now.addingTimeInterval(5) ? t : start.addingTimeInterval(-(k - 1) * 1800)
+    }
+
+    /// 앱이 화면에 있을 때 호출: 카드 문구가 다음 30분 칸으로 넘어갔으면 카드만 갱신한다
+    static func tickIfNeeded(store: Store) {
+        guard let a = Activity<NextUpAttributes>.activities.first, a.content.state.result == nil else { return }
+        let s = a.content.state
+        guard s.start > Date() else { return }
+        let m = max(Int((s.start.timeIntervalSinceNow / 60).rounded(.up)), 1)
+        if lastBucket != bucket(minutesLeft: m) { refresh(store: store) }
+    }
+    private static var lastBucket: Int?
+
+    /// 백그라운드에서도 다음 30분 경계에 깨워 달라고 요청 (iOS가 시각을 조금 늦출 수 있음)
+    static func scheduleTick(start: Date?) {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: tickTaskID)
+        guard let start, let at = nextBoundary(start: start) else { return }
+        let r = BGAppRefreshTaskRequest(identifier: tickTaskID)
+        r.earliestBeginDate = at
+        try? BGTaskScheduler.shared.submit(r)
+    }
+
+    static func registerTick() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: tickTaskID, using: nil) { task in
+            Task { @MainActor in
+                let store = Store()
+                let settings = store.settings
+                var next = store.upNext(now: Date())
+                if let e = settings.extended, e.until > Date(), let item = store.items.first(where: { $0.id == e.itemID }) {
+                    next = (item: item, when: e.until)
+                }
+                await apply(next: next, settings: settings, force: false)
+                scheduleTick(start: next?.when)
+                task.setTaskCompleted(success: true)
+            }
+        }
     }
 
     static func apply(next: (item: ScheduleItem, when: Date)?, settings: AppSettings, force: Bool) async {
@@ -74,7 +127,10 @@ enum LiveActivityManager {
         let minuteOfDay = Day.cal.component(.hour, from: when) * 60 + Day.cal.component(.minute, from: when)
         let shownTime = minuteOfDay == x.start % 1440 ? timeLabel : Day.clock(minuteOfDay) + "까지 (연장)"
         let minutesLeft = max(Int((when.timeIntervalSinceNow / 60).rounded(.up)), 1)
-        let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: minutesLeft)
+        // 문구는 30분 칸마다 한 번씩 바뀐다 (2:17 남음 → '2시간' 문구, 2:00이 되면 다음 문구는 1:30에)
+        let shown = bucket(minutesLeft: minutesLeft)
+        lastBucket = shown
+        let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: shown)
         let avatarURL = Store.activeAvatarURL(settings)
         return NextUpAttributes.ContentState(
             itemID: x.id,

@@ -62,6 +62,9 @@ struct RootView: View {
             _ = await NotificationScheduler.shared.requestAuthorization()
             store.reschedule()
         }
+        .onReceive(Timer.publish(every: 15, on: .main, in: .common).autoconnect()) { _ in
+            if phase == .active { LiveActivityManager.tickIfNeeded(store: store) }
+        }
         .onChange(of: phase) { _, newPhase in
             if newPhase == .active { store.reschedule() }
         }

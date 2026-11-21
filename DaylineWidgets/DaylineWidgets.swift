@@ -239,7 +239,7 @@ struct NextUpLockScreen: View {
         if state.result == "done" {
             bubble(Text("잘했어! 오늘도 하나 해냈다").font(.system(size: 14.5, weight: .semibold)).foregroundColor(CardStyle.text))
         } else if started {
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Text("잘 마무리했어?")
                     .font(.system(size: 14.5, weight: .semibold))
                     .foregroundStyle(CardStyle.text)

@@ -378,18 +378,22 @@ final class Store: ObservableObject {
 
     /// '못 했어' → n분 연장. 연장한 시각에 카드와 알림으로 다시 묻는다.
     func extend(itemID: String, start: Date, minutes: Int) {
+        ResultLog.clearDone(itemID: itemID, around: start)
         ResultLog.record(ResultLog.key(itemID, start), done: false)
         settings.extended = Extension(itemID: itemID, until: Date().addingTimeInterval(TimeInterval(minutes * 60)))
     }
 
     /// '오늘은 그만할래'
     func giveUp(itemID: String, start: Date) {
+        ResultLog.clearDone(itemID: itemID, around: start)
         ResultLog.record(ResultLog.key(itemID, start), done: false)
         if settings.extended?.itemID == itemID { settings.extended = nil } else { reschedule() }
     }
 
     /// 오늘 이 일정을 '했어'로 마무리했는지
     func finished(_ item: ScheduleItem, on key: String) -> Bool {
+        // 연장 중이면 아직 안 끝난 것
+        if let e = settings.extended, e.itemID == item.id, e.until > Date() { return false }
         let prefix = item.id + "|"
         let dayStart = Day.date(key), dayEnd = Day.add(dayStart, 1)
         return ResultLog.all().contains { k, done in

@@ -14,6 +14,18 @@ enum ResultLog {
 
     static func result(_ itemID: String, _ start: Date) -> Bool? { all()[key(itemID, start)] }
 
+    /// 같은 날 이 일정에 남은 '했어' 기록을 지운다 (나중에 '못 했어'로 답을 바꾼 경우)
+    static func clearDone(itemID: String, around start: Date) {
+        let prefix = itemID + "|"
+        let cal = Calendar.current
+        var d = all()
+        for (k, done) in d where done && k.hasPrefix(prefix) {
+            if let t = Double(k.dropFirst(prefix.count)),
+               cal.isDate(Date(timeIntervalSince1970: t), inSameDayAs: start) { d[k] = false }
+        }
+        UserDefaults.standard.set(d, forKey: defaultsKey)
+    }
+
     static func record(_ key: String, done: Bool) {
         var d = all()
         d[key] = done
