@@ -86,15 +86,15 @@ jobs:
           size = os.path.getsize("Dayline.ipa")
           date = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
           ipa = f"https://github.com/{repo}/releases/download/v{version}/Dayline.ipa"
-          icon = f"https://raw.githubusercontent.com/{repo}/main/Dayline/Assets.xcassets/AppIcon.appiconset/icon-dark.png"
+          icon = f"https://raw.githubusercontent.com/{repo}/main/Dayline/Assets.xcassets/AppIcon.appiconset/icon-light.png"
           app = {
-              "name": "Dayline",
+              "name": "핑 Ping",
               "bundleIdentifier": "app.dayline.ios",
               "developerName": owner,
               "subtitle": "시간표 · 일정 · 할 일",
               "localizedDescription": "고정 시간표, 약속, 반복 할 일을 한곳에서. 앱을 닫아도 아이폰이 직접 잔소리 알림을 보내요.",
               "iconURL": icon,
-              "tintColor": "6c8ee8",
+              "tintColor": "7B5CE6",
               "category": "productivity",
               "versions": [{
                   "version": version,
@@ -114,7 +114,7 @@ jobs:
               "appPermissions": {"entitlements": [], "privacy": {}},
           }
           source = {
-              "name": "Dayline",
+              "name": "핑 Ping",
               "identifier": "app.dayline.source",
               "sourceURL": f"https://github.com/{repo}/releases/latest/download/source.json",
               "iconURL": icon,

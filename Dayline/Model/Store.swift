@@ -113,7 +113,7 @@ final class Store: ObservableObject {
 
     enum ImportError: LocalizedError {
         case empty
-        var errorDescription: String? { "Dayline 기록을 찾지 못했어요. 내보내기 한 JSON 파일인지 확인해 주세요." }
+        var errorDescription: String? { "앱 기록을 찾지 못했어요. 내보내기 한 JSON 파일인지 확인해 주세요." }
     }
 
     /// 웹앱 내보내기 파일 또는 이 앱의 백업 파일을 합친다. 같은 id는 가져온 쪽이 이긴다(할 일은 최신 수정본).

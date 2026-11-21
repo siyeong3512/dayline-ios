@@ -53,7 +53,7 @@ struct SettingsView: View {
             .fileImporter(isPresented: $importing, allowedContentTypes: [.json, .plainText]) { result in
                 importFile(result)
             }
-            .alert("Dayline", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
+            .alert("핑", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
                 Button("확인", role: .cancel) {}
             } message: {
                 Text(notice ?? "")
@@ -140,7 +140,7 @@ struct SettingsView: View {
             if store.settings.liveActivity {
                 Button("다음 일정으로 지금 띄워보기") {
                     if !LiveActivityManager.isAvailable {
-                        notice = "아이폰 설정 > Dayline > 실시간 현황(라이브 액티비티)이 꺼져 있어요. 켠 뒤 다시 눌러주세요."
+                        notice = "아이폰 설정 > 핑 > 실시간 현황(라이브 액티비티)이 꺼져 있어요. 켠 뒤 다시 눌러주세요."
                     } else if store.upNext() == nil {
                         notice = "다가오는 일정이 없어요. 시간표나 약속을 먼저 추가해 주세요."
                     } else {
@@ -284,7 +284,7 @@ struct SettingsView: View {
                 Label("웹앱 기록 가져오기 (JSON)", systemImage: "square.and.arrow.down")
             }
             ShareLink(item: ExportFile(data: store.exportData()),
-                      preview: SharePreview("Dayline 백업", image: Image(systemName: "doc.text"))) {
+                      preview: SharePreview("핑 백업", image: Image(systemName: "doc.text"))) {
                 Label("전체 내보내기", systemImage: "square.and.arrow.up")
             }
             NavigationLink {

@@ -274,7 +274,7 @@ struct PersonToneView: View {
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json, .plainText]) { result in
             importTone(result)
         }
-        .alert("Dayline", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
+        .alert("핑", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("확인", role: .cancel) {}
         } message: {
             Text(notice ?? "")
