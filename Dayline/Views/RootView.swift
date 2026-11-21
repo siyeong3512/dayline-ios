@@ -68,7 +68,6 @@ struct RootView: View {
         }
         .onChange(of: phase) { _, newPhase in
             if newPhase == .active {
-                LiveActivityManager.rerollLine()
                 store.reschedule()
                 Task { await CyberCampus.syncIfNeeded(store: store) }
             }

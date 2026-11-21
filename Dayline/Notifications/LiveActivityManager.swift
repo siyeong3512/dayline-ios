@@ -111,13 +111,16 @@ enum LiveActivityManager {
             return
         }
 
+        // 카드를 지웠다가 새로 띄울 때만 문구(와 끼어들기)를 새로 뽑는다
+        rerollLine()
+        state = makeState(next.item, next.when, settings: settings)
         for a in current { await a.end(nil, dismissalPolicy: .immediate) }
         _ = try? Activity.request(attributes: NextUpAttributes(),
                                   content: ActivityContent(state: state, staleDate: next.when),
                                   pushType: nil)
     }
 
-    /// 앱을 열거나 '지금 띄워보기'를 누를 때마다 올라가는 번호. 카드 문구(와 끼어들기)를 새로 뽑는다.
+    /// 카드를 새로 띄울 때마다 올라가는 번호. 카드 문구(와 끼어들기)를 새로 뽑는다.
     static var reroll: Int { UserDefaults.standard.integer(forKey: "cardReroll") }
     static func rerollLine() { UserDefaults.standard.set(reroll + 1, forKey: "cardReroll") }
 
