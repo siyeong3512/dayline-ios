@@ -338,6 +338,12 @@ struct Person: Codable, Identifiable, Hashable {
     var customTone: CustomTone?
 }
 
+/// '못 했어'로 연장한 마감
+struct Extension: Codable, Equatable {
+    var itemID: String
+    var until: Date
+}
+
 struct AppSettings: Codable, Equatable {
     var tone: NagTone = .friend
     var voiceEnabled = false
@@ -355,12 +361,14 @@ struct AppSettings: Codable, Equatable {
     var todoCheck = true
     /// 체크 시각(자정부터 분). 기본 밤 9시
     var todoCheckMinutes = 21 * 60
+    /// 연장 중인 일정
+    var extended: Extension?
 
     init() {}
 
     enum CodingKeys: String, CodingKey {
         case tone, voiceEnabled, voiceID, theme, customTone, chatStyle, liveActivity
-        case people, activePersonID, todoCheck, todoCheckMinutes
+        case people, activePersonID, todoCheck, todoCheckMinutes, extended
     }
 
     var activePerson: Person? {
@@ -382,6 +390,7 @@ struct AppSettings: Codable, Equatable {
         todoCheck = (try? c.decode(Bool.self, forKey: .todoCheck)) ?? true
         let rawMinutes = (try? c.decode(Int.self, forKey: .todoCheckMinutes)) ?? 21 * 60
         todoCheckMinutes = min(max(rawMinutes, 0), 1439)
+        extended = try? c.decode(Extension.self, forKey: .extended)
     }
 
     /// 지금 쓰는 말투: 고른 사람에게 따로 정한 말투가 있으면 그것, 없으면 기본 말투

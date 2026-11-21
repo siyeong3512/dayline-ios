@@ -29,17 +29,16 @@ struct TimetableView: View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             Screen(title: "시간표", actionLabel: "수업 추가",
                    action: { sheet = .schedule(newClass(day: Day.weekday(Date()), minutes: 9 * 60), isNew: true) }) {
-                grid(days: days, from: from, hours: to - from, segs: segs)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                Text(store.timetable.isEmpty ? "빈칸을 누르면 그 시간에 수업을 추가해요" : "블록을 누르면 수정할 수 있어요")
-                    .font(.system(size: 13)).foregroundStyle(Theme.faint)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                VStack(alignment: .leading, spacing: 12) {
+                    grid(days: days, from: from, hours: to - from, segs: segs)
+                    Text(store.timetable.isEmpty ? "빈칸을 누르면 그 시간에 수업을 추가해요" : "블록을 누르면 수정할 수 있어요")
+                        .font(.system(size: 12.5)).foregroundStyle(Theme.faint)
+                        .padding(.leading, 6)
+                }
+                .card(vertical: 14, horizontal: 10)
                 Band()
                 todayClasses(now: context.date)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 22)
+                    .card()
             }
         }
     }
@@ -69,11 +68,11 @@ struct TimetableView: View {
                                 titleColor: end < now ? Theme.faint : Theme.text) {
                             if start > now {
                                 Text(TimeText.until(start, from: now))
-                                    .font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
+                                    .font(.system(size: 14.5, weight: .semibold)).foregroundStyle(Theme.accent)
                             } else if end > now {
-                                Text("수업 중").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
+                                Text("수업 중").font(.system(size: 14.5, weight: .semibold)).foregroundStyle(Theme.accent)
                             } else {
-                                Text("끝").font(.system(size: 14)).foregroundStyle(Theme.faint)
+                                Text("끝").font(.system(size: 14.5)).foregroundStyle(Theme.faint)
                             }
                         }
                     }
@@ -92,7 +91,7 @@ struct TimetableView: View {
                 Color.clear.frame(width: gutter, height: 30)
                 ForEach(days, id: \.self) { d in
                     Text(Day.names[d])
-                        .font(.system(size: 13, weight: d == todayWeekday ? .heavy : .medium))
+                        .font(.system(size: 13.5, weight: d == todayWeekday ? .bold : .medium))
                         .foregroundStyle(d == todayWeekday ? Theme.accent : Theme.faint)
                         .frame(maxWidth: .infinity, minHeight: 30)
                 }
@@ -101,7 +100,7 @@ struct TimetableView: View {
                 VStack(spacing: 0) {
                     ForEach(0..<hours, id: \.self) { i in
                         Text("\(from + i)")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 10.5, weight: .medium))
                             .foregroundStyle(Theme.faint)
                             .padding(.trailing, 5)
                             .frame(width: gutter, height: unit, alignment: .topTrailing)
@@ -146,10 +145,10 @@ struct TimetableView: View {
     private func block(_ s: Segment) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(s.item.title)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 11.5, weight: .bold))
                 .lineLimit(3)
             if !s.item.place.isEmpty {
-                Text(s.item.place).font(.system(size: 10)).lineLimit(1).opacity(0.85)
+                Text(s.item.place).font(.system(size: 10.5, weight: .medium)).lineLimit(1).opacity(0.8)
             }
             if s.continued {
                 Text("이어서").font(.system(size: 9)).opacity(0.7)
@@ -158,7 +157,7 @@ struct TimetableView: View {
         .padding(6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .foregroundStyle(Palette.strong(s.item.color))
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.soft(s.item.color)))
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Palette.solid(s.item.color)))
         .contentShape(Rectangle())
         .onTapGesture { sheet = .schedule(s.item, isNew: false) }
         .accessibilityElement(children: .combine)

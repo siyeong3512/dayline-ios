@@ -10,16 +10,13 @@ struct HomeView: View {
             Screen(title: Day.format(context.date, "MMMMdEEEE"), actionLabel: "할 일 추가",
                    action: { sheet = .todo(TodoItem(cadence: .daily), isNew: true) }) {
                 nextUp(context.date)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                    .card(vertical: 18)
                 Band()
                 todoSection(key)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 22)
+                    .card()
                 Band()
                 todaySection(key, now: context.date)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 22)
+                    .card()
             }
         }
     }
@@ -30,12 +27,12 @@ struct HomeView: View {
     private func nextUp(_ now: Date) -> some View {
         if let next = store.upNext(now: now) {
             HStack(spacing: 14) {
-                IconBadge(systemImage: "clock.fill", bg: Theme.accentSoft, fg: Theme.accent, size: 48)
-                VStack(alignment: .leading, spacing: 2) {
+                IconBadge(systemImage: "clock.fill", bg: Theme.accentSoft, fg: Theme.accent, size: 46)
+                VStack(alignment: .leading, spacing: 2.5) {
                     Text(TimeText.until(next.when, from: now) + (next.item.place.isEmpty ? "" : " · " + next.item.place))
-                        .font(.system(size: 14)).foregroundStyle(Theme.sub)
+                        .font(.system(size: 13.5)).foregroundStyle(Theme.faint)
                     Text(next.item.title)
-                        .font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+                        .font(.system(size: 19.5, weight: .bold)).foregroundStyle(Theme.text)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -43,10 +40,10 @@ struct HomeView: View {
             }
         } else {
             HStack(spacing: 14) {
-                IconBadge(systemImage: "sun.max.fill", bg: Theme.pill, fg: Theme.faint, size: 48)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("다가오는 일정").font(.system(size: 14)).foregroundStyle(Theme.sub)
-                    Text("여유로운 하루예요").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+                IconBadge(systemImage: "sun.max.fill", bg: Theme.pill, fg: Theme.faint, size: 46)
+                VStack(alignment: .leading, spacing: 2.5) {
+                    Text("다가오는 일정").font(.system(size: 13.5)).foregroundStyle(Theme.faint)
+                    Text("여유로운 하루예요").font(.system(size: 19.5, weight: .bold)).foregroundStyle(Theme.text)
                 }
             }
         }
@@ -68,8 +65,8 @@ struct HomeView: View {
                         Capsule().fill(Theme.accent).frame(width: max(geo.size.width * progress, progress > 0 ? 6 : 0))
                     }
                 }
-                .frame(height: 6)
-                .padding(.top, 8)
+                .frame(height: 5)
+                .padding(.top, 10)
                 .padding(.bottom, 6)
                 .animation(.easeOut(duration: 0.45), value: progress)
             }
@@ -101,7 +98,13 @@ struct HomeView: View {
                                 meta: (x.kind == .timetable ? "수업 · " : "약속 · ") + TimeText.ampm(x.time) + (x.place.isEmpty ? "" : " · " + x.place),
                                 title: x.title,
                                 titleColor: Day.at(key, x.time) < now ? Theme.faint : Theme.text) {
-                            Chevron()
+                            if store.finished(x, on: key) {
+                                Label("했어", systemImage: "checkmark")
+                                    .font(.system(size: 13.5, weight: .semibold))
+                                    .foregroundStyle(Theme.accent)
+                            } else {
+                                Chevron()
+                            }
                         }
                     }
                     .buttonStyle(.plain)
@@ -133,11 +136,11 @@ struct TodoRow: View {
 
             Button(action: onToggle) {
                 Text(done ? "완료" : "체크")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 14.5, weight: .semibold))
                     .foregroundStyle(done ? Color.white : Theme.pillText)
-                    .padding(.horizontal, 13)
-                    .frame(height: 34)
-                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(done ? Theme.accent : Theme.pill))
+                    .padding(.horizontal, 14.5)
+                    .frame(height: 35)
+                    .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(done ? Theme.accent : Theme.pill))
             }
             .buttonStyle(PressStyle())
             .sensoryFeedback(.success, trigger: done) { _, new in new }

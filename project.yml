@@ -47,6 +47,10 @@ targets:
           - INSendMessageIntent
         NSSupportsLiveActivities: true
         LSSupportsOpeningDocumentsInPlace: false
+        CFBundleURLTypes:
+          - CFBundleURLName: app.dayline.ios
+            CFBundleURLSchemes:
+              - pingapp
         UIFileSharingEnabled: false
 
   # 잠금화면·다이내믹 아일랜드 라이브 액티비티
@@ -63,6 +67,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: "YES"
         APPLICATION_EXTENSION_API_ONLY: "YES"
+        CODE_SIGN_ENTITLEMENTS: DaylineWidgets/DaylineWidgets.entitlements
     info:
       path: DaylineWidgets/Info.plist
       properties:

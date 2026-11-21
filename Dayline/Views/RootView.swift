@@ -19,6 +19,8 @@ struct RootView: View {
     @State private var tab: Tab = .home
     @State private var barTab: Tab = .home
     @State private var sheet: EditorSheet?
+    /// 잠금화면 카드의 '못 했어'로 열린 연장 화면
+    @State private var extend: ExtendRequest?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -48,6 +50,12 @@ struct RootView: View {
                     .environmentObject(store)
                     .presentationDetents([.medium, .large])
             }
+        }
+        .sheet(item: $extend) { r in
+            ExtendSheet(request: r).environmentObject(store)
+        }
+        .onOpenURL { url in
+            if let r = ExtendRequest(url: url) { extend = r }
         }
         .preferredColorScheme(store.settings.theme.scheme)
         .task {

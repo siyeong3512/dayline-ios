@@ -2,7 +2,7 @@ import ActivityKit
 import SwiftUI
 
 /// 앱과 위젯 확장이 함께 쓰는 라이브 액티비티 데이터.
-/// 앱이 다음 일정 정보를 넘겨주고, 카운트다운은 iOS가 알아서 줄여준다(서버·App Group 불필요).
+/// 앱이 다음 일정 정보를 넘겨주고, 카운트다운은 iOS가 알아서 줄여준다.
 struct NextUpAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var itemID: String
@@ -23,7 +23,14 @@ struct NextUpAttributes: ActivityAttributes {
         var line: String?
         /// 프로필 사진 썸네일(JPEG, 2~3KB). 라이브 액티비티 데이터는 4KB 제한이라 아주 작게.
         var avatar: Data?
+        /// 공유 폴더(App Group)의 고화질 사진 파일 이름 "avatar-<key>.jpg"
+        var avatarKey: String?
+        /// "done"이면 '했어'를 누른 뒤
+        var result: String?
     }
+
+    /// 고화질 프로필 사진 (공유 폴더)
+    static func avatarFile(_ key: String) -> URL? { SharedBox.file("avatar-\(key).jpg") }
 
     static func color(_ hex: String) -> Color {
         let v = UInt64(hex, radix: 16) ?? 0x6c8ee8

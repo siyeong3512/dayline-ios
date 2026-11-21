@@ -24,8 +24,7 @@ struct CalendarScreen: View {
                 modePicker
                 if mode == .month { monthGrid } else { dateStrip }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 22)
+            .card()
             Band()
             ZStack(alignment: .topLeading) {
                 page
@@ -207,8 +206,7 @@ struct CalendarScreen: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 22)
+        .card()
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 

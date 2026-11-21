@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import UIKit
 import WidgetKit
@@ -30,8 +31,9 @@ enum WidgetTheme {
 struct NextUpLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NextUpAttributes.self) { context in
-            NextUpLockScreen(state: context.state, started: context.isStale)
-                .activitySystemActionForegroundColor(WidgetTheme.accent)
+            NextUpLockScreen(state: context.state, started: context.isStale || context.state.start <= Date())
+                .activityBackgroundTint(CardStyle.base)
+                .activitySystemActionForegroundColor(CardStyle.accent)
         } dynamicIsland: { context in
             let s = context.state
             return DynamicIsland {
@@ -79,16 +81,24 @@ struct NextUpLiveActivity: Widget {
     }
 }
 
-/// 보낸 사람 얼굴(썸네일). 없으면 일정 색 동그라미에 시계.
+
+/// 보낸 사람 얼굴. 공유 폴더의 고화질 사진 → 작은 썸네일 → 일정 색 동그라미 순서로 쓴다.
 struct Face: View {
     let state: NextUpAttributes.ContentState
     let size: CGFloat
 
+    private var image: UIImage? {
+        if let key = state.avatarKey, let url = NextUpAttributes.avatarFile(key),
+           let img = UIImage(contentsOfFile: url.path) { return img }
+        if let data = state.avatar { return UIImage(data: data) }
+        return nil
+    }
+
     var body: some View {
         let tint = NextUpAttributes.color(state.colorHex)
         Group {
-            if let data = state.avatar, let image = UIImage(data: data) {
-                Image(uiImage: image).resizable().scaledToFill()
+            if let image {
+                Image(uiImage: image).resizable().interpolation(.high).scaledToFill()
             } else {
                 tint.overlay {
                     Image(systemName: "clock.fill").font(.system(size: size * 0.42)).foregroundStyle(Color.white)
@@ -97,7 +107,7 @@ struct Face: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(WidgetTheme.accent, lineWidth: size >= 40 ? 2.5 : 1.5))
+        .overlay(Circle().strokeBorder(CardStyle.accent, lineWidth: size >= 40 ? 2 : 1.5))
     }
 }
 
@@ -112,68 +122,141 @@ struct Countdown: View {
     }
 }
 
+/// 잠금화면 카드 색 (밝은/어두운 모드 상관없이 같은 짙은 라벤더 카드)
+enum CardStyle {
+    static func hex(_ v: UInt64, _ a: Double = 1) -> Color {
+        Color(red: Double((v >> 16) & 0xff) / 255, green: Double((v >> 8) & 0xff) / 255,
+              blue: Double(v & 0xff) / 255, opacity: a)
+    }
+    static let base = hex(0x16131F)
+    static let accent = hex(0xB6A3FF)
+    static let text = hex(0xF7F5FF)
+    static let sub = hex(0xA9A3BD)
+    static let bubble = Color.white.opacity(0.08)
+
+    static var background: some View {
+        ZStack {
+            LinearGradient(colors: [hex(0x2E2550), hex(0x17142A), hex(0x100E17)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            RadialGradient(colors: [hex(0x8C6CF5, 0.42), .clear],
+                           center: .topTrailing, startRadius: 0, endRadius: 190)
+        }
+    }
+}
+
 struct NextUpLockScreen: View {
     let state: NextUpAttributes.ContentState
-    /// 시작 시각이 지나면 true (staleDate = 시작 시각)
+    /// 시작 시각이 지났으면 true
     let started: Bool
 
     /// 1시간 넘게 남으면 "1:16:23"(7자리), 아니면 "16:23"(5자리)
     private var longForm: Bool { state.start.timeIntervalSinceNow >= 3600 }
-    private var countdownSize: CGFloat { longForm ? 40 : 50 }
-    private var countdownWidth: CGFloat { longForm ? 160 : 142 }
+    private var key: String { ResultLog.key(state.itemID, state.start) }
+    private var extendURL: URL {
+        URL(string: "pingapp://extend?id=\(state.itemID)&start=\(Int(state.start.timeIntervalSince1970))")!
+    }
 
-    // 잠금화면 라이브 액티비티는 높이가 최대 약 160pt. 그 안에서 최대한 크게 채운다.
-    // 사진은 왼쪽, 글자는 모두 사진 오른쪽 칸에 쌓는다.
+    // 잠금화면 카드는 높이가 최대 약 160pt. 위: 사진·제목·남은 시간 / 아래: 말풍선 또는 마무리 체크
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Face(state: state, size: 72)
-
-            VStack(alignment: .leading, spacing: 6) {
-                // 위: 제목(최대 2줄)  |  남은 시간(크게)
-                HStack(alignment: .top, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                Face(state: state, size: 54)
+                VStack(alignment: .leading, spacing: 2.5) {
                     Text(state.title)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(WidgetTheme.text)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if started {
-                        Text("시작했어요")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(WidgetTheme.accent)
-                    } else {
-                        VStack(alignment: .trailing, spacing: -4) {
-                            Countdown(state: state)
-                                .font(.system(size: countdownSize, weight: .heavy, design: .rounded))
-                                .foregroundStyle(WidgetTheme.accent)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
-                                .frame(width: countdownWidth, alignment: .trailing)
-                            Text("남음").font(.system(size: 13)).foregroundStyle(WidgetTheme.sub)
-                        }
-                    }
+                        .font(.system(size: 19.5, weight: .bold))
+                        .foregroundStyle(CardStyle.text)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place)
+                        .font(.system(size: 13.5, weight: .medium))
+                        .foregroundStyle(CardStyle.sub)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                trailing
+            }
+            bottom
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 13)
+        .background(CardStyle.background)
+        .overlay(
+            ContainerRelativeShape()
+                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.22), CardStyle.accent.opacity(0.18), Color.white.opacity(0.04)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+        )
+    }
 
-                // 시간 · 장소
-                Text(state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place)
-                    .font(.system(size: 15))
-                    .foregroundStyle(WidgetTheme.sub)
+    @ViewBuilder
+    private var trailing: some View {
+        if state.result == "done" {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(CardStyle.accent)
+        } else if started {
+            Text("시간 됐어")
+                .font(.system(size: 15.5, weight: .bold))
+                .foregroundStyle(CardStyle.accent)
+        } else {
+            VStack(alignment: .trailing, spacing: -3) {
+                Countdown(state: state)
+                    .font(.system(size: longForm ? 36 : 44, weight: .heavy, design: .rounded))
+                    .foregroundStyle(CardStyle.accent)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                // 보낸 사람 + 잔소리 (최대 2줄)
-                if let line = state.line, !started {
-                    (Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 15, weight: .bold)).foregroundColor(WidgetTheme.accent)
-                        + Text(line).font(.system(size: 15)).foregroundColor(WidgetTheme.text))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                    .minimumScaleFactor(0.6)
+                    .frame(width: longForm ? 146 : 122, alignment: .trailing)
+                Text("남음").font(.system(size: 11.5, weight: .medium)).foregroundStyle(CardStyle.sub)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
-        .frame(minHeight: 130, alignment: .center)
+    }
+
+    @ViewBuilder
+    private var bottom: some View {
+        if state.result == "done" {
+            bubble(Text("잘했어! 오늘도 하나 해냈다").font(.system(size: 14.5, weight: .semibold)).foregroundColor(CardStyle.text))
+        } else if started {
+            HStack(spacing: 8) {
+                Text("잘 마무리했어?")
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundStyle(CardStyle.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(intent: FinishIntent(key: key)) {
+                    Text("했어")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(CardStyle.base)
+                        .padding(.horizontal, 16)
+                        .frame(height: 34)
+                        .background(Capsule().fill(CardStyle.accent))
+                }
+                .buttonStyle(.plain)
+                Link(destination: extendURL) {
+                    Text("못 했어")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(CardStyle.text)
+                        .padding(.horizontal, 14)
+                        .frame(height: 34)
+                        .background(Capsule().fill(Color.white.opacity(0.12)))
+                }
+            }
+        } else if let line = state.line {
+            bubble(
+                Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 14.5, weight: .bold)).foregroundColor(CardStyle.accent)
+                    + Text(line).font(.system(size: 14.5)).foregroundColor(CardStyle.text)
+            )
+        }
+    }
+
+    private func bubble(_ text: Text) -> some View {
+        text
+            .lineLimit(2)
+            .minimumScaleFactor(0.85)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(CardStyle.bubble))
     }
 }

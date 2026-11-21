@@ -327,6 +327,31 @@ final class Store: ObservableObject {
         reschedule()
     }
 
+    // MARK: 마무리 체크
+
+    /// '못 했어' → n분 연장. 연장한 시각에 카드와 알림으로 다시 묻는다.
+    func extend(itemID: String, start: Date, minutes: Int) {
+        ResultLog.record(ResultLog.key(itemID, start), done: false)
+        settings.extended = Extension(itemID: itemID, until: Date().addingTimeInterval(TimeInterval(minutes * 60)))
+    }
+
+    /// '오늘은 그만할래'
+    func giveUp(itemID: String, start: Date) {
+        ResultLog.record(ResultLog.key(itemID, start), done: false)
+        if settings.extended?.itemID == itemID { settings.extended = nil } else { reschedule() }
+    }
+
+    /// 오늘 이 일정을 '했어'로 마무리했는지
+    func finished(_ item: ScheduleItem, on key: String) -> Bool {
+        let prefix = item.id + "|"
+        let dayStart = Day.date(key), dayEnd = Day.add(dayStart, 1)
+        return ResultLog.all().contains { k, done in
+            guard done, k.hasPrefix(prefix), let t = Double(k.dropFirst(prefix.count)) else { return false }
+            let d = Date(timeIntervalSince1970: t)
+            return d >= dayStart && d < dayEnd
+        }
+    }
+
     func reschedule() {
         let snapshotItems = items
         let snapshotTodos = todos

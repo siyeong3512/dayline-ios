@@ -18,16 +18,24 @@ enum AvatarImage {
         return output.jpegData(compressionQuality: 0.85)
     }
 
-    /// 라이브 액티비티용 아주 작은 썸네일. 크기 제한(4KB)을 넘지 않게 줄이고, 못 맞추면 nil.
+    /// 정사각형으로 맞춰 줄인 이미지 (고품질 보간)
+    static func resized(_ image: UIImage, side: CGFloat) -> UIImage {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let scale = side / min(image.size.width, image.size.height)
+        let w = image.size.width * scale, h = image.size.height * scale
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { ctx in
+            ctx.cgContext.interpolationQuality = .high
+            image.draw(in: CGRect(x: (side - w) / 2, y: (side - h) / 2, width: w, height: h))
+        }
+    }
+
+    /// 라이브 액티비티용 작은 썸네일(공유 폴더를 못 쓸 때 대신 씀). 4KB 제한 안에 들게 줄이고, 못 맞추면 nil.
     static func thumbnail(from url: URL, maxBytes: Int = 2400) -> Data? {
         guard let data = try? Data(contentsOf: url), let image = UIImage(data: data) else { return nil }
-        for side in [84, 76, 68, 60, 52, 44] as [CGFloat] {
-            let format = UIGraphicsImageRendererFormat.default()
-            format.scale = 1
-            let small = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
-                image.draw(in: CGRect(x: 0, y: 0, width: side, height: side))
-            }
-            for quality in [0.55, 0.42, 0.32, 0.24] as [CGFloat] {
+        for side in [96, 88, 80, 72, 64, 56] as [CGFloat] {
+            let small = resized(image, side: side)
+            for quality in [0.62, 0.5, 0.4, 0.3] as [CGFloat] {
                 if let jpeg = small.jpegData(compressionQuality: quality), jpeg.count <= maxBytes { return jpeg }
             }
         }

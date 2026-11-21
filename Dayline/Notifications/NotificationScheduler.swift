@@ -162,6 +162,18 @@ actor NotificationScheduler {
                                                   trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
         }
 
+        // '못 했어'로 연장한 마감이 끝날 때 한 번 더 알림
+        if let e = settings.extended, e.until > Date(), let item = items.first(where: { $0.id == e.itemID }) {
+            let content = UNMutableNotificationContent()
+            content.title = Nag.sender(settings: settings) ?? item.title
+            content.body = "연장한 시간 끝! \(item.title) 잘 마무리했어?"
+            content.threadIdentifier = "extend"
+            content.sound = .default
+            let comps = Day.cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: e.until)
+            requests.append(UNNotificationRequest(identifier: "extend-" + e.itemID, content: content,
+                                                  trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
+        }
+
         guard gen == generation else { return }
         center.removeAllPendingNotificationRequests()
         for r in requests { try? await center.add(r) }

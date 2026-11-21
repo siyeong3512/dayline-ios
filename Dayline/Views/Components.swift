@@ -13,7 +13,7 @@ struct Screen<Content: View>: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center) {
                     Text(title)
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.system(size: 25.5, weight: .bold))
                         .foregroundStyle(Theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -22,22 +22,33 @@ struct Screen<Content: View>: View {
                         SoftButton(title: actionLabel ?? "추가", action: action)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
-                .padding(.bottom, 18)
+                .padding(.horizontal, 22)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
                 content
             }
             .padding(.bottom, 110)
         }
         .scrollIndicators(.hidden)
-        .background(Theme.bg.ignoresSafeArea())
+        .background(Theme.screen.ignoresSafeArea())
     }
 }
 
-/// 섹션 사이 두꺼운 회색 띠
+/// 카드 사이 간격
 struct Band: View {
     var body: some View {
-        Rectangle().fill(Theme.band).frame(height: 12)
+        Color.clear.frame(height: 10)
+    }
+}
+
+extension View {
+    /// 토스식 둥근 카드 (화면 양옆 12, 안쪽 20)
+    func card(vertical: CGFloat = 20, horizontal: CGFloat = 20) -> some View {
+        padding(.horizontal, horizontal)
+            .padding(.vertical, vertical)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.card))
+            .padding(.horizontal, 12)
     }
 }
 
@@ -47,10 +58,10 @@ struct SectionHeader: View {
 
     var body: some View {
         HStack(alignment: .center) {
-            Text(title).font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+            Text(title).font(.system(size: 18.5, weight: .bold)).foregroundStyle(Theme.text)
             Spacer()
             if let trailing {
-                Text(trailing).font(.system(size: 15)).foregroundStyle(Theme.sub)
+                Text(trailing).font(.system(size: 14.5, weight: .medium)).foregroundStyle(Theme.faint)
             }
         }
     }
@@ -64,11 +75,11 @@ struct SoftButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 14.5, weight: .semibold))
                 .foregroundStyle(Theme.accentStrong)
-                .padding(.horizontal, 14)
-                .frame(height: 36)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.accentSoft))
+                .padding(.horizontal, 14.5)
+                .frame(height: 35)
+                .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Theme.accentSoft))
         }
         .buttonStyle(PressStyle())
     }
@@ -90,7 +101,7 @@ struct IconBadge: View {
     var systemImage: String?
     let bg: Color
     let fg: Color
-    var size: CGFloat = 40
+    var size: CGFloat = 42
 
     var body: some View {
         ZStack {
@@ -99,7 +110,7 @@ struct IconBadge: View {
                 Image(systemName: systemImage).font(.system(size: size * 0.42, weight: .semibold))
             } else if let text {
                 Text(text)
-                    .font(.system(size: text.count > 2 ? 12 : 14, weight: .heavy))
+                    .font(.system(size: text.count > 2 ? 12.5 : 15, weight: .bold))
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                     .padding(.horizontal, 3)
@@ -123,10 +134,10 @@ struct ListRow<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 14) {
             badge
-            VStack(alignment: .leading, spacing: 2) {
-                Text(meta).font(.system(size: 13)).foregroundStyle(Theme.faint).lineLimit(1)
+            VStack(alignment: .leading, spacing: 2.5) {
+                Text(meta).font(.system(size: 13.5)).foregroundStyle(Theme.faint).lineLimit(1)
                 Text(title)
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 16.5, weight: .semibold))
                     .foregroundStyle(titleColor)
                     .strikethrough(strike, color: Theme.faint)
                     .lineLimit(2)
@@ -134,7 +145,7 @@ struct ListRow<Trailing: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             trailing
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 9)
         .contentShape(Rectangle())
     }
 }
@@ -151,9 +162,9 @@ struct EmptyNote: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 15))
+            .font(.system(size: 14.5))
             .foregroundStyle(Theme.faint)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
     }
 }
 

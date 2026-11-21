@@ -32,6 +32,9 @@ extension Color {
 
 enum Theme {
     static let bg = Color.dynamic("FFFFFF", "101114")
+    /// 화면 바탕(카드 뒤) / 카드
+    static let screen = Color.dynamic("F2F4F6", "121317")
+    static let card = Color.dynamic("FFFFFF", "1D1E24")
     /// 섹션 사이 두꺼운 띠, 회색 바탕
     static let band = Color.dynamic("F2F4F6", "1A1B1F")
     static let text = Color.dynamic("191F28", "F2F3F5")
@@ -54,6 +57,14 @@ extension Palette {
     static func soft(_ i: Int) -> Color {
         let c = base(i)
         return Color(uiColor: UIColor { t in c.withAlphaComponent(t.userInterfaceStyle == .dark ? 0.28 : 0.15) })
+    }
+
+    /// 불투명한 연한 색 (시간표 블록). 카드 색 위에 섞은 것과 같은 색
+    static func solid(_ i: Int) -> Color {
+        let c = base(i)
+        return Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark ? c.mixed(with: UIColor(hex: "1D1E24"), 0.66) : c.mixed(with: .white, 0.8)
+        })
     }
 
     /// 연한 배경 위 글씨 (진한 색)
