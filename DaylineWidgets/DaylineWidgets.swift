@@ -273,13 +273,16 @@ struct NextUpLockScreen: View {
             }
         } else if let line = state.line {
             let duo = state.cameoLine != nil
-            // 끼어들 때는 두 말풍선의 시작 위치를 맞춘다 (예전 작은 사진 자리만큼 들여쓰기: 14 + 22 + 7)
+            // 끼어들 때는 메인 말풍선을 끼어든 말풍선 시작 위치에 맞춘다 (14 + 사진 22 + 간격 7)
             VStack(alignment: .leading, spacing: 5) {
                 message(name: state.sender, line: line, color: CardStyle.accent(state), small: duo)
                     .padding(.leading, duo ? 43 : 0)
                 if let cameo = state.cameoLine {
-                    message(name: state.cameoName, line: cameo, color: CardStyle.accent(hex: state.cameoHex), small: true)
-                        .padding(.leading, 43)
+                    HStack(alignment: .center, spacing: 7) {
+                        MiniFace(key: state.cameoAvatarKey, name: state.cameoName ?? "", color: CardStyle.accent(hex: state.cameoHex))
+                        message(name: state.cameoName, line: cameo, color: CardStyle.accent(hex: state.cameoHex), small: true)
+                    }
+                    .padding(.leading, 14)
                 }
             }
         }
