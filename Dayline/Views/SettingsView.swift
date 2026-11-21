@@ -160,10 +160,14 @@ struct SettingsView: View {
 
     private var toneSection: some View {
         Section {
-            Picker("말투", selection: $store.settings.tone) {
+            Picker("기본 말투", selection: $store.settings.tone) {
                 ForEach(NagTone.allCases.filter { $0 != .custom || store.settings.customTone != nil }) { t in
                     Text(t == .custom ? (store.settings.customTone?.name ?? t.label) : t.label).tag(t)
                 }
+            }
+            if let p = store.settings.activePerson, p.tone != nil {
+                Text("지금은 \(p.name)의 말투(\(PersonToneView.label(p, settings: store.settings)))로 보내요. 보낸 사람 > 수정 > 말투에서 바꿔요.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("미리보기").font(.caption).foregroundStyle(.secondary)
@@ -226,7 +230,7 @@ struct SettingsView: View {
         } header: {
             Text("잔소리")
         } footer: {
-            Text("말투와 보낸 사람은 따로 골라요. 보낸 사람의 이름이 알림 제목이 되고 사진은 알림 오른쪽과 잠금화면 카드에 붙어요. 나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 문장과 사진은 이 아이폰 안에만 저장돼요.")
+            Text("기본 말투는 보낸 사람이 없거나, 그 사람에게 말투를 따로 정하지 않았을 때 써요. 보낸 사람마다 말투를 따로 정하려면 보낸 사람 > 수정 > 말투로 가요. 보낸 사람의 이름이 알림 제목이 되고 사진은 알림 오른쪽과 잠금화면 카드에 붙어요. 나만의 말투는 말투 파일(dayline-tone)을 가져와서 써요. 문장과 사진은 이 아이폰 안에만 저장돼요.")
         }
     }
 

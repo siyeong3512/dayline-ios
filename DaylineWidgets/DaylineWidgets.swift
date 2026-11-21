@@ -117,66 +117,63 @@ struct NextUpLockScreen: View {
     /// 시작 시각이 지나면 true (staleDate = 시작 시각)
     let started: Bool
 
-    private var kind: String { state.kindLabel == "시간표" ? "수업" : "약속" }
-
     /// 1시간 넘게 남으면 "1:16:23"(7자리), 아니면 "16:23"(5자리)
     private var longForm: Bool { state.start.timeIntervalSinceNow >= 3600 }
-    private var countdownSize: CGFloat { longForm ? 36 : 44 }
-    private var countdownWidth: CGFloat { longForm ? 158 : 130 }
+    private var countdownSize: CGFloat { longForm ? 40 : 50 }
+    private var countdownWidth: CGFloat { longForm ? 160 : 142 }
 
-    // 잠금화면 라이브 액티비티는 높이가 약 160pt로 제한된다.
-    // 사진은 왼쪽에 두고, 글자는 모두 사진 오른쪽 칸에 쌓는다.
+    // 잠금화면 라이브 액티비티는 높이가 최대 약 160pt. 그 안에서 최대한 크게 채운다.
+    // 사진은 왼쪽, 글자는 모두 사진 오른쪽 칸에 쌓는다.
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Face(state: state, size: 60)
+        HStack(alignment: .top, spacing: 14) {
+            Face(state: state, size: 72)
 
             VStack(alignment: .leading, spacing: 6) {
-                // 위: 다음 수업 / 제목 / 시간·장소  |  남은 시간(크게)
+                // 위: 제목(최대 2줄)  |  남은 시간(크게)
                 HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("다음 \(kind)")
-                            .font(.system(size: 13))
-                            .foregroundStyle(WidgetTheme.sub)
-                        Text(state.title)
-                            .font(.system(size: 19, weight: .bold))
-                            .foregroundStyle(WidgetTheme.text)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        Text(state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place)
-                            .font(.system(size: 13))
-                            .foregroundStyle(WidgetTheme.sub)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(state.title)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(WidgetTheme.text)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     if started {
                         Text("시작했어요")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 22, weight: .bold))
                             .foregroundStyle(WidgetTheme.accent)
                     } else {
-                        VStack(alignment: .trailing, spacing: -2) {
+                        VStack(alignment: .trailing, spacing: -4) {
                             Countdown(state: state)
                                 .font(.system(size: countdownSize, weight: .heavy, design: .rounded))
                                 .foregroundStyle(WidgetTheme.accent)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
                                 .frame(width: countdownWidth, alignment: .trailing)
-                            Text("남음").font(.system(size: 12)).foregroundStyle(WidgetTheme.sub)
+                            Text("남음").font(.system(size: 13)).foregroundStyle(WidgetTheme.sub)
                         }
                     }
                 }
 
-                // 아래: 보낸 사람 + 잔소리 (최대 2줄, 사진 오른쪽 칸 폭 그대로)
+                // 시간 · 장소
+                Text(state.place.isEmpty ? state.timeLabel : state.timeLabel + " · " + state.place)
+                    .font(.system(size: 15))
+                    .foregroundStyle(WidgetTheme.sub)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                // 보낸 사람 + 잔소리 (최대 2줄)
                 if let line = state.line, !started {
-                    (Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 14, weight: .bold)).foregroundColor(WidgetTheme.accent)
-                        + Text(line).font(.system(size: 14)).foregroundColor(WidgetTheme.text))
+                    (Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 15, weight: .bold)).foregroundColor(WidgetTheme.accent)
+                        + Text(line).font(.system(size: 15)).foregroundColor(WidgetTheme.text))
                         .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .frame(minHeight: 130, alignment: .center)
     }
 }

@@ -250,7 +250,7 @@ enum NagTone: String, Codable, CaseIterable, Identifiable {
 
 /// 사용자가 파일로 가져오는 말투. 앱 안(설정 파일)에만 저장되고 코드·저장소에는 들어가지 않는다.
 /// 문장 안의 {title} {left} {place} {time}은 일정 정보로 바뀐다.
-struct CustomTone: Codable, Equatable {
+struct CustomTone: Codable, Hashable {
     var name: String
     /// 알림 제목에 보낸 사람처럼 표시할 이름(없으면 일정 이름이 제목)
     var sender: String?
@@ -330,9 +330,12 @@ enum ThemeMode: String, Codable, CaseIterable, Identifiable {
 }
 
 /// 알림을 보내는 사람(이름 + 프로필 사진). 사진은 Application Support/Dayline/avatars/<id>.jpg
+/// tone이 nil이면 설정 > 잔소리의 기본 말투를 따라간다. customTone은 이 사람 전용 말투 파일.
 struct Person: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var name: String
+    var tone: NagTone?
+    var customTone: CustomTone?
 }
 
 struct AppSettings: Codable, Equatable {
@@ -381,9 +384,14 @@ struct AppSettings: Codable, Equatable {
         todoCheckMinutes = min(max(rawMinutes, 0), 1439)
     }
 
+    /// 지금 쓰는 말투: 고른 사람에게 따로 정한 말투가 있으면 그것, 없으면 기본 말투
+    var currentTone: NagTone { activePerson?.tone ?? tone }
+    /// 지금 쓰는 나만의 말투 파일
+    var currentCustom: CustomTone? { activePerson?.tone != nil ? activePerson?.customTone : customTone }
+
     /// 나만의 말투를 골랐는데 파일이 없으면 '친구처럼'으로
     var effectiveTone: NagTone {
-        tone == .custom && !(customTone?.isUsable ?? false) ? .friend : tone
+        currentTone == .custom && !(currentCustom?.isUsable ?? false) ? .friend : currentTone
     }
 }
 

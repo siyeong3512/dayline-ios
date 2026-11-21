@@ -7,7 +7,7 @@ enum Nag {
         let tone = settings.effectiveTone
         let pool = templates(settings: settings, tone: tone, minutesBefore: n)
         guard !pool.isEmpty else { return "\(ReminderOption.amount(n)) 뒤 시작해요." }
-        let seed = "\(item.id)|\(n)|\(tone.rawValue)|\(settings.customTone?.name ?? "")"
+        let seed = "\(item.id)|\(n)|\(tone.rawValue)|\(settings.currentCustom?.name ?? "")"
         let pick = pool[Int(stableHash(seed) % UInt64(pool.count))]
         return pick
             .replacingOccurrences(of: "{left}", with: ReminderOption.amount(n))
@@ -28,7 +28,7 @@ enum Nag {
         let pool: [String]
         switch settings.effectiveTone {
         case .custom:
-            let lines = settings.customTone?.todo ?? []
+            let lines = settings.currentCustom?.todo ?? []
             pool = lines.isEmpty ? friendTodo : lines
         case .plain: pool = ["{period} 할 일 {count}개가 남았어요."]
         case .gentle: pool = ["{period} 할 일 {count}개 남았어요. 하나씩 해볼까요?",
@@ -91,7 +91,7 @@ enum Nag {
         case .plain:
             return ["{left} 뒤 시작해요."]
         case .custom:
-            return settings.customTone?.pool(stage: stage) ?? []
+            return settings.currentCustom?.pool(stage: stage) ?? []
         case .gentle:
             return [
                 ["{title}까지 {left} 남았어요. 천천히 준비해요.",
