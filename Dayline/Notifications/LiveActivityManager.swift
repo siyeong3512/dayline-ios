@@ -133,6 +133,7 @@ enum LiveActivityManager {
         lastBucket = shown
         let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: shown)
         let avatarURL = Store.activeAvatarURL(settings)
+        let extra = line == nil ? nil : cameo(for: x, bucket: shown, settings: settings)
         return NextUpAttributes.ContentState(
             itemID: x.id,
             title: x.title,
@@ -147,7 +148,30 @@ enum LiveActivityManager {
             avatar: avatarURL.flatMap { AvatarImage.thumbnail(from: $0) },
             avatarKey: avatarURL.flatMap { shareAvatar($0, personID: settings.activePersonID ?? "x") },
             result: nil,
-            accentHex: settings.activePerson?.colorHex)
+            accentHex: settings.activePerson?.colorHex,
+            cameoName: extra?.name,
+            cameoLine: extra?.line,
+            cameoHex: extra?.hex,
+            cameoAvatarKey: extra?.avatarKey)
+    }
+
+    /// 확률(약 35%)로 다른 프로필이 자기 말투로 한마디 끼어든다.
+    /// 같은 일정·같은 30분 칸에서는 늘 같은 결과라 새로 고쳐도 깜빡이지 않는다.
+    static let cameoChance: UInt64 = 35
+
+    static func cameo(for x: ScheduleItem, bucket: Int, settings: AppSettings)
+        -> (name: String, line: String, hex: String?, avatarKey: String?)? {
+        let others = settings.people.filter { $0.id != settings.activePersonID }
+        guard settings.activePerson != nil, !others.isEmpty else { return nil }
+        let seed = "\(x.id)|\(bucket)|cameo"
+        guard Nag.stableHash(seed) % 100 < cameoChance else { return nil }
+        let other = others[Int(Nag.stableHash(seed + "|who") % UInt64(others.count))]
+        var s = settings
+        s.activePersonID = other.id
+        guard s.effectiveTone != .plain else { return nil }
+        let line = Nag.line(settings: s, item: x, minutesBefore: bucket, salt: "|cameo")
+        let key = Store.activeAvatarURL(s).flatMap { shareAvatar($0, personID: other.id) }
+        return (other.name, line, other.colorHex, key)
     }
 
     /// 고화질 사진을 공유 폴더에 복사하고 파일 키를 돌려준다(이미 있으면 그대로)
@@ -157,9 +181,9 @@ enum LiveActivityManager {
         let key = "\(personID)-\(Int(modified?.timeIntervalSince1970 ?? 0))"
         guard let dest = NextUpAttributes.avatarFile(key) else { return nil }
         if FileManager.default.fileExists(atPath: dest.path) { return key }
-        // 옛 사진 정리
+        // 같은 사람의 옛 사진만 정리 (끼어드는 사람 사진은 남겨둔다)
         if let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
-            for f in files where f.hasPrefix("avatar-") { try? FileManager.default.removeItem(at: dir.appendingPathComponent(f)) }
+            for f in files where f.hasPrefix("avatar-\(personID)-") { try? FileManager.default.removeItem(at: dir.appendingPathComponent(f)) }
         }
         guard let data = try? Data(contentsOf: src),
               let image = UIImage(data: data),

@@ -3,11 +3,11 @@ import Foundation
 /// 알림 문구(잔소리). 같은 일정·같은 알림 시점이면 늘 같은 문장을 골라서,
 /// 목소리 파일도 다시 만들 필요가 없게 한다.
 enum Nag {
-    static func line(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int) -> String {
+    static func line(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int, salt: String = "") -> String {
         let tone = settings.effectiveTone
         let pool = templates(settings: settings, tone: tone, minutesBefore: n)
         guard !pool.isEmpty else { return "\(ReminderOption.amount(n)) 뒤 시작해요." }
-        let seed = "\(item.id)|\(n)|\(tone.rawValue)|\(settings.currentCustom?.name ?? "")"
+        let seed = "\(item.id)|\(n)|\(tone.rawValue)|\(settings.currentCustom?.name ?? "")" + salt
         let pick = pool[Int(stableHash(seed) % UInt64(pool.count))]
         return pick
             .replacingOccurrences(of: "{left}", with: ReminderOption.amount(n))

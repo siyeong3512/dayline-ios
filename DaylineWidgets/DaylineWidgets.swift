@@ -60,7 +60,7 @@ struct NextUpLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if let line = s.line {
-                        Text(line)
+                        Secret { Text(line) }
                             .font(.subheadline)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -156,6 +156,13 @@ enum CardStyle {
 
     /// 짙은 카드 위에서 잘 보이게 밝힌 글씨·숫자 색
     static func accent(_ s: NextUpAttributes.ContentState) -> Color { mix(s, 0.38) }
+
+    /// 끼어든 사람 색 (같은 방식으로 밝힘)
+    static func accent(hex: String?) -> Color {
+        let v = UInt64(hex ?? "7B5CE6", radix: 16) ?? 0x7B5CE6
+        func f(_ c: UInt64) -> Double { let x = Double(c & 0xff) / 255; return x + (1 - x) * 0.38 }
+        return Color(red: f(v >> 16), green: f(v >> 8), blue: f(v))
+    }
 
     static func background(_ s: NextUpAttributes.ContentState) -> some View {
         ZStack {
@@ -265,11 +272,39 @@ struct NextUpLockScreen: View {
                 }
             }
         } else if let line = state.line {
-            bubble(
-                Text(state.sender.map { $0 + "  " } ?? "").font(.system(size: 14.5, weight: .bold)).foregroundColor(CardStyle.accent(state))
-                    + Text(line).font(.system(size: 14.5)).foregroundColor(CardStyle.text)
-            )
+            let duo = state.cameoLine != nil
+            VStack(alignment: .leading, spacing: 5) {
+                message(name: state.sender, line: line, color: CardStyle.accent(state), small: duo)
+                if let cameo = state.cameoLine {
+                    HStack(alignment: .center, spacing: 7) {
+                        MiniFace(key: state.cameoAvatarKey, name: state.cameoName ?? "", color: CardStyle.accent(hex: state.cameoHex))
+                        message(name: state.cameoName, line: cameo, color: CardStyle.accent(hex: state.cameoHex), small: true)
+                    }
+                    .padding(.leading, 14)
+                }
+            }
         }
+    }
+
+    /// 이름은 늘 보이고, 문구는 잠금(Face ID 전)·상시표시(AOD)에서 "···"로 가린다
+    private func message(name: String?, line: String, color: Color, small: Bool) -> some View {
+        let size: CGFloat = small ? 13.5 : 14.5
+        return HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if let name {
+                Text(name).font(.system(size: size, weight: .bold)).foregroundStyle(color)
+                    .fixedSize()
+            }
+            Secret {
+                Text(line).font(.system(size: size)).foregroundColor(CardStyle.text)
+            }
+            .lineLimit(small ? 1 : 2)
+            .minimumScaleFactor(0.85)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, small ? 10 : 12)
+        .padding(.vertical, small ? 6 : 8)
+        .background(RoundedRectangle(cornerRadius: small ? 12 : 14, style: .continuous).fill(CardStyle.bubble))
     }
 
     private func bubble(_ text: Text) -> some View {
@@ -281,5 +316,50 @@ struct NextUpLockScreen: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(CardStyle.bubble))
+    }
+}
+
+/// 잠금 상태(Face ID 전)나 상시표시(AOD)에서는 내용 대신 "···"를 보여준다
+struct Secret<Content: View>: View {
+    @Environment(\.redactionReasons) private var redaction
+    @Environment(\.isLuminanceReduced) private var dimmed
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Group {
+            if redaction.contains(.privacy) || dimmed {
+                Text("···")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(CardStyle.sub)
+                    .unredacted()
+            } else {
+                content()
+            }
+        }
+        .privacySensitive()
+    }
+}
+
+/// 끼어든 사람의 작은 얼굴 (공유 폴더 사진, 없으면 이름 첫 글자)
+struct MiniFace: View {
+    let key: String?
+    let name: String
+    let color: Color
+    private let size: CGFloat = 22
+
+    var body: some View {
+        Group {
+            if let key, let url = NextUpAttributes.avatarFile(key), let img = UIImage(contentsOfFile: url.path),
+               let small = img.preparingThumbnail(of: CGSize(width: size * 3, height: size * 3)) {
+                Image(uiImage: small).resizable().interpolation(.high).scaledToFill()
+            } else {
+                color.opacity(0.35).overlay {
+                    Text(String(name.prefix(1))).font(.system(size: 11, weight: .bold)).foregroundStyle(CardStyle.text)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(color, lineWidth: 1.2))
     }
 }

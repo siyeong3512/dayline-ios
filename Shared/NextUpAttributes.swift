@@ -29,6 +29,11 @@ struct NextUpAttributes: ActivityAttributes {
         var result: String?
         /// 보낸 사람 색 (카드·다이내믹 아일랜드). nil이면 기본 라벤더
         var accentHex: String?
+        /// 다른 프로필이 끼어든 한 줄 (가끔)
+        var cameoName: String?
+        var cameoLine: String?
+        var cameoHex: String?
+        var cameoAvatarKey: String?
     }
 
     /// 고화질 프로필 사진 (공유 폴더)
