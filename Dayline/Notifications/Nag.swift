@@ -14,6 +14,7 @@ enum Nag {
             .replacingOccurrences(of: "{title}", with: item.title)
             .replacingOccurrences(of: "{place}", with: item.place.isEmpty ? "거기" : item.place)
             .replacingOccurrences(of: "{time}", with: item.time)
+            .josaFixed
     }
 
     /// 설정 > 보낸 사람에서 고른 사람 이름 (없으면 nil → 알림 제목은 일정 이름)
@@ -41,6 +42,7 @@ enum Nag {
         return pick
             .replacingOccurrences(of: "{period}", with: period)
             .replacingOccurrences(of: "{count}", with: "\(count)")
+            .josaFixed
     }
 
     private static let friendTodo = ["야 {period} 할 일 {count}개 남았다. 자기 전에 끝내자.",
@@ -97,7 +99,7 @@ enum Nag {
                 ["{title}까지 {left} 남았어요. 천천히 준비해요.",
                  "오늘 {title} 있는 날이에요. 미리 챙겨두면 마음이 편해요."],
                 ["{left} 뒤 {title}. 슬슬 준비해볼까요?",
-                 "{place}로 갈 시간이 다가와요. 물 한 잔 챙겨요."],
+                 "{place}(으)로 갈 시간이 다가와요. 물 한 잔 챙겨요."],
                 ["{left} 남았어요. 이제 출발해요!",
                  "곧 {title} 시작이에요. 오늘도 잘할 거예요."]
             ][stage]
@@ -128,4 +130,82 @@ enum Nag {
         for b in s.utf8 { h = (h &<< 5) &+ h &+ UInt64(b) }
         return h
     }
+}
+
+// MARK: - 조사 고르기
+
+/// 문장 속 "을/를", "이/가", "(으)로", "(이)" 같은 표기를 바로 앞 글자의 받침에 맞게 하나로 고른다.
+/// 예) "{title}을/를 챙겨" → "자료구조를 챙겨", "{place}(으)로 가자" → "K501로 가자"
+enum Josa {
+    /// (표기, 받침 있을 때, 받침 없을 때). 긴 표기를 먼저 찾는다.
+    private static let rules: [(String, String, String)] = [
+        ("이에요/예요", "이에요", "예요"), ("이라서/라서", "이라서", "라서"),
+        ("이랑/랑", "이랑", "랑"), ("이야/야", "이야", "야"), ("이나/나", "이나", "나"),
+        ("이라/라", "이라", "라"), ("이지/지", "이지", "지"),
+        ("이/가", "이", "가"), ("가/이", "이", "가"),
+        ("을/를", "을", "를"), ("를/을", "을", "를"),
+        ("은/는", "은", "는"), ("는/은", "은", "는"),
+        ("과/와", "과", "와"), ("와/과", "과", "와"),
+        ("아/야", "아", "야"), ("(이)", "이", "")
+    ]
+
+    static func fix(_ text: String) -> String {
+        var s = text
+        for token in ["(으)로", "으로/로"] {
+            s = replace(s, token) { b in b == .consonant ? "으로" : "로" }
+        }
+        for (token, yes, no) in rules {
+            s = replace(s, token) { b in b == .vowel ? no : yes }
+        }
+        return s
+    }
+
+    enum Final { case vowel, consonant, rieul }
+
+    private static func replace(_ s: String, _ token: String, pick: (Final?) -> String) -> String {
+        var out = s
+        var searchEnd = out.endIndex
+        while let r = out.range(of: token, options: .backwards, range: out.startIndex..<searchEnd) {
+            out.replaceSubrange(r, with: pick(final(before: r.lowerBound, in: out)))
+            searchEnd = r.lowerBound
+        }
+        return out
+    }
+
+    /// 바로 앞 글자의 받침. 따옴표·괄호는 건너뛰고, 공백이나 문장 처음을 만나면 알 수 없음(nil).
+    private static func final(before i: String.Index, in s: String) -> Final? {
+        var j = i
+        while j > s.startIndex {
+            j = s.index(before: j)
+            let c = s[j]
+            if c.isWhitespace { return nil }
+            if "'\"‘’“”)]」』".contains(c) { continue }
+            return final(of: c)
+        }
+        return nil
+    }
+
+    private static func final(of c: Character) -> Final? {
+        guard let v = c.unicodeScalars.first?.value else { return nil }
+        if (0xAC00...0xD7A3).contains(v) {
+            let jong = (v - 0xAC00) % 28
+            return jong == 0 ? .vowel : jong == 8 ? .rieul : .consonant
+        }
+        switch c {
+        case "0", "3", "6": return .consonant       // 영 삼 육
+        case "1", "7", "8": return .rieul      // 일 칠 팔
+        case "2", "4", "5", "9": return .vowel
+        default: break
+        }
+        switch c.lowercased() {
+        case "l": return .rieul
+        case "m", "n": return .consonant
+        case _ where c.isLetter && c.isASCII: return .vowel
+        default: return nil
+        }
+    }
+}
+
+extension String {
+    var josaFixed: String { Josa.fix(self) }
 }
