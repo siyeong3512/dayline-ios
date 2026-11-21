@@ -33,8 +33,8 @@ extension Color {
 enum Theme {
     static let bg = Color.dynamic("FFFFFF", "101114")
     /// 화면 바탕(카드 뒤) / 카드
-    static let screen = Color.dynamic("F2F4F6", "121317")
-    static let card = Color.dynamic("FFFFFF", "1D1E24")
+    static let screen = Color.dynamic("F2F4F6", "000000")
+    static let card = Color.dynamic("FFFFFF", "1C1C21")
     /// 섹션 사이 두꺼운 띠, 회색 바탕
     static let band = Color.dynamic("F2F4F6", "1A1B1F")
     static let text = Color.dynamic("191F28", "F2F3F5")
@@ -47,7 +47,7 @@ enum Theme {
     static let pill = Color.dynamic("F2F4F6", "2A2C32")
     static let pillText = Color.dynamic("4E5968", "C9CCD3")
     static let tabIdle = Color.dynamic("B0B8C1", "6B707B")
-    static let tabBar = Color.dynamic("FFFFFF", "17181C")
+    static let tabBar = Color.dynamic("FFFFFF", "141417")
 }
 
 extension Palette {
@@ -63,7 +63,7 @@ extension Palette {
     static func solid(_ i: Int) -> Color {
         let c = base(i)
         return Color(uiColor: UIColor { t in
-            t.userInterfaceStyle == .dark ? c.mixed(with: UIColor(hex: "1D1E24"), 0.66) : c.mixed(with: .white, 0.8)
+            t.userInterfaceStyle == .dark ? c.mixed(with: UIColor(hex: "1C1C21"), 0.66) : c.mixed(with: .white, 0.8)
         })
     }
 
