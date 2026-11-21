@@ -47,7 +47,7 @@ targets:
           - INSendMessageIntent
         NSSupportsLiveActivities: true
         UIBackgroundModes: [fetch]
-        BGTaskSchedulerPermittedIdentifiers: [app.dayline.ios.tick]
+        BGTaskSchedulerPermittedIdentifiers: [app.dayline.ios.tick, app.dayline.ios.cyber]
         LSSupportsOpeningDocumentsInPlace: false
         CFBundleURLTypes:
           - CFBundleURLName: app.dayline.ios

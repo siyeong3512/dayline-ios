@@ -4,6 +4,9 @@ import SwiftUI
 /// 모든 기록은 아이폰 안(Application Support/Dayline)에 JSON으로 저장한다.
 /// 저장할 때마다 이전 파일을 Backups 폴더에 남긴다(30분에 1개, 최대 30개).
 final class Store: ObservableObject {
+    /// 앱·백그라운드 작업·단축어가 같은 저장소를 쓰도록 하나만 만든다
+    static let shared = Store()
+
     @Published private(set) var items: [ScheduleItem] = []
     @Published private(set) var todos: [TodoItem] = []
     @Published var settings = AppSettings() {
@@ -162,6 +165,7 @@ final class Store: ObservableObject {
     }
 
     func delete(_ item: ScheduleItem) {
+        if item.id.hasPrefix(CyberCampus.idPrefix) { CyberCampus.ignored.insert(item.id) }
         items.removeAll { $0.id == item.id }
         commit()
     }
@@ -372,6 +376,48 @@ final class Store: ObservableObject {
     private func commit() {
         save()
         reschedule()
+    }
+
+    // MARK: 사이버캠퍼스
+
+    /// 가져온 과제·시험을 약속으로 넣는다. 이미 있으면 시각·제목만 고치고(알림·색은 그대로),
+    /// 목록에서 사라진(제출한) 앞으로의 항목은 지운다. 반영한 개수를 돌려준다.
+    @discardableResult
+    func applyCyber(_ entries: [CyberCampus.Entry]) -> Int {
+        let ignored = CyberCampus.ignored
+        let now = Date()
+        var changed = false
+        var keep = Set<String>()
+        for e in entries {
+            let id = CyberCampus.idPrefix + e.seq
+            keep.insert(id)
+            guard !ignored.contains(id), e.due > now else { continue }
+            let course = CyberCampus.shortCourse(e.course)
+            let title = (course.isEmpty ? "" : course + " ") + e.name
+            let date = Day.key(e.due)
+            let time = Day.clock(Day.minutesOfDay(e.due))
+            if let i = items.firstIndex(where: { $0.id == id }) {
+                var x = items[i]
+                if x.title != title || x.date != date || x.time != time {
+                    x.title = title; x.date = date; x.time = time
+                    items[i] = x
+                    changed = true
+                }
+            } else {
+                let color = Int(Nag.stableHash(e.course) % UInt64(Palette.colors.count))
+                items.append(ScheduleItem(id: id, kind: .event, title: title, place: "",
+                                          date: date, time: time, duration: 60,
+                                          color: color, reminders: [1440, 180, 60]))
+                changed = true
+            }
+        }
+        let before = items.count
+        items.removeAll { x in
+            x.id.hasPrefix(CyberCampus.idPrefix) && !keep.contains(x.id) && Day.at(x.date, x.time) > now
+        }
+        if items.count != before { changed = true }
+        if changed { commit() }
+        return entries.filter { $0.due > now }.count
     }
 
     // MARK: 마무리 체크

@@ -55,6 +55,7 @@ struct SettingsView: View {
                 notificationSection
                 todoCheckSection
                 liveActivitySection
+                CyberCampusSection()
                 toneSection
                 voiceSection
                 Section("화면") {

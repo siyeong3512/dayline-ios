@@ -65,7 +65,8 @@ enum LiveActivityManager {
     static func registerTick() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: tickTaskID, using: nil) { task in
             Task { @MainActor in
-                let store = Store()
+                let store = Store.shared
+                await CyberCampus.syncIfNeeded(store: store)
                 let settings = store.settings
                 var next = store.upNext(now: Date())
                 if let e = settings.extended, e.until > Date(), let item = store.items.first(where: { $0.id == e.itemID }) {

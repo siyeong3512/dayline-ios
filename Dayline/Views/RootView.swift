@@ -61,12 +61,17 @@ struct RootView: View {
         .task {
             _ = await NotificationScheduler.shared.requestAuthorization()
             store.reschedule()
+            await CyberCampus.syncIfNeeded(store: store, minInterval: 60)
         }
         .onReceive(Timer.publish(every: 15, on: .main, in: .common).autoconnect()) { _ in
             if phase == .active { LiveActivityManager.tickIfNeeded(store: store) }
         }
         .onChange(of: phase) { _, newPhase in
-            if newPhase == .active { store.reschedule() }
+            if newPhase == .active {
+                store.reschedule()
+                Task { await CyberCampus.syncIfNeeded(store: store) }
+            }
+            if newPhase == .background { CyberCampus.scheduleBackground() }
         }
         .alert("저장 오류", isPresented: Binding(get: { store.lastError != nil },
                                               set: { if !$0 { store.lastError = nil } })) {

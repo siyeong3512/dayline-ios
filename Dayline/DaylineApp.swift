@@ -4,7 +4,7 @@ import UserNotifications
 @main
 struct DaylineApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var store = Store()
+    @StateObject private var store = Store.shared
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         LiveActivityManager.registerTick()
+        CyberCampus.registerBackground()
         return true
     }
 
