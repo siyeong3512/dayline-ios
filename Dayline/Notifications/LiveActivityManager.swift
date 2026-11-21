@@ -170,8 +170,8 @@ enum LiveActivityManager {
         s.activePersonID = other.id
         guard s.effectiveTone != .plain else { return nil }
         let line = Nag.line(settings: s, item: x, minutesBefore: bucket, salt: "|cameo")
-        let key = Store.activeAvatarURL(s).flatMap { shareAvatar($0, personID: other.id) }
-        return (other.name, line, other.colorHex, key)
+        // 끼어드는 사람은 사진 없이 이름·색만
+        return (other.name, line, other.colorHex, nil)
     }
 
     /// 고화질 사진을 공유 폴더에 복사하고 파일 키를 돌려준다(이미 있으면 그대로)
