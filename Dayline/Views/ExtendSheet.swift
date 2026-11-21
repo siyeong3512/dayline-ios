@@ -33,9 +33,9 @@ struct ExtendSheet: View {
             Text((item?.title ?? "일정") + " · 연장하면 그 시간에 다시 물어볼게요")
                 .font(.system(size: 14.5))
                 .foregroundStyle(Theme.sub)
-                .padding(.top, 6)
+                .padding(.top, 8)
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                 ForEach(options, id: \.self) { m in
                     Button {
                         store.extend(itemID: request.itemID, start: request.start, minutes: m)
@@ -50,7 +50,7 @@ struct ExtendSheet: View {
                     .buttonStyle(PressStyle())
                 }
             }
-            .padding(.top, 22)
+            .padding(.top, 24)
 
             Button {
                 store.giveUp(itemID: request.itemID, start: request.start)
@@ -64,7 +64,7 @@ struct ExtendSheet: View {
             .buttonStyle(PressStyle())
             .padding(.top, 8)
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, 24)
         .padding(.top, 28)
         .padding(.bottom, 12)
         .presentationDetents([.height(330)])

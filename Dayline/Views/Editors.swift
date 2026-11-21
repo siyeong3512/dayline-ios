@@ -34,7 +34,7 @@ struct ScheduleEditor: View {
                 Section {
                     DatePicker(isTimetable ? "반복 시작일" : "날짜", selection: $dateValue, displayedComponents: .date)
                     if isTimetable {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("반복 요일").font(.subheadline).foregroundStyle(.secondary)
                             WeekdayPicker(selection: $item.weekdays)
                         }

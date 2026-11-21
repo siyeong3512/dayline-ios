@@ -22,7 +22,7 @@ struct Screen<Content: View>: View {
                         SoftButton(title: actionLabel ?? "추가", action: action)
                     }
                 }
-                .padding(.horizontal, 22)
+                .padding(.horizontal, 24)
                 .padding(.top, 12)
                 .padding(.bottom, 16)
                 content
@@ -37,7 +37,7 @@ struct Screen<Content: View>: View {
 /// 카드 사이 간격
 struct Band: View {
     var body: some View {
-        Color.clear.frame(height: 10)
+        Color.clear.frame(height: 12)
     }
 }
 
@@ -77,9 +77,9 @@ struct SoftButton: View {
             Text(title)
                 .font(.system(size: 14.5, weight: .semibold))
                 .foregroundStyle(Theme.accentStrong)
-                .padding(.horizontal, 14.5)
-                .frame(height: 35)
-                .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Theme.accentSoft))
+                .padding(.horizontal, 16)
+                .frame(height: 36)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.accentSoft))
         }
         .buttonStyle(PressStyle())
     }
@@ -113,7 +113,7 @@ struct IconBadge: View {
                     .font(.system(size: text.count > 2 ? 12.5 : 15, weight: .bold))
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
-                    .padding(.horizontal, 3)
+                    .padding(.horizontal, 4)
             }
         }
         .foregroundStyle(fg)
@@ -132,9 +132,9 @@ struct ListRow<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             badge
-            VStack(alignment: .leading, spacing: 2.5) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(meta).font(.system(size: 13.5)).foregroundStyle(Theme.faint).lineLimit(1)
                 Text(title)
                     .font(.system(size: 16.5, weight: .semibold))
@@ -145,7 +145,7 @@ struct ListRow<Trailing: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             trailing
         }
-        .padding(.vertical, 9)
+        .padding(.vertical, 8)
         .contentShape(Rectangle())
     }
 }
@@ -192,6 +192,7 @@ enum Tab: String, CaseIterable, Identifiable {
 }
 
 struct TabBar: View {
+    @Environment(\.colorScheme) private var scheme
     let selected: Tab
     let onSelect: (Tab) -> Void
 
@@ -217,11 +218,18 @@ struct TabBar: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.top, 6)
+        .padding(.top, 8)
         .background(
             UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous)
                 .fill(Theme.tabBar)
-                .shadow(color: Color.black.opacity(0.07), radius: 12, y: -2)
+                // 밝은 화면은 옅은 그림자, 어두운 화면은 그림자 대신 얇은 선으로 구분
+                .shadow(color: Color.black.opacity(scheme == .dark ? 0 : 0.07), radius: 12, y: -2)
+                .overlay(alignment: .top) {
+                    if scheme == .dark {
+                        UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    }
+                }
                 .ignoresSafeArea(edges: .bottom)
         )
         .sensoryFeedback(.selection, trigger: selected)
@@ -233,7 +241,7 @@ struct TabBar: View {
 struct WeekdayPicker: View {
     @Binding var selection: [Int]
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             ForEach(Day.mondayFirst, id: \.self) { d in
                 let on = selection.contains(d)
                 Button {
@@ -277,9 +285,9 @@ struct ReminderChips: View {
 
 struct ColorGrid: View {
     @Binding var selection: Int
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 6)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 6)
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 10) {
+        LazyVGrid(columns: columns, spacing: 8) {
             ForEach(Palette.colors.indices, id: \.self) { i in
                 Button { selection = i } label: {
                     Circle()
@@ -296,6 +304,6 @@ struct ColorGrid: View {
                 .accessibilityLabel(Palette.names[i])
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 }

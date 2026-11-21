@@ -21,7 +21,7 @@ struct ToneLibraryView: View {
                     let users = store.toneUsers(t.id)
                     HStack(spacing: 12) {
                         IconBadge(systemImage: "text.bubble.fill", bg: Theme.accentSoft, fg: Theme.accent, size: 38)
-                        VStack(alignment: .leading, spacing: 2.5) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(t.name).font(.system(size: 16.5, weight: .semibold)).foregroundStyle(Theme.text)
                             Text("문장 \(t.count)개" + (users.isEmpty ? "" : " · " + users.joined(separator: ", ") + "에서 쓰는 중"))
                                 .font(.system(size: 13)).foregroundStyle(Theme.faint)

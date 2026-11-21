@@ -19,7 +19,7 @@ struct CalendarScreen: View {
     var body: some View {
         Screen(title: Day.format(Day.date(selected), "MMMM") + " 일정", actionLabel: "약속 추가",
                action: { sheet = .schedule(ScheduleItem(kind: .event, date: selected, time: "12:00", reminders: [60]), isNew: true) }) {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
                 controls
                 modePicker
                 if mode == .month { monthGrid } else { dateStrip }
@@ -47,7 +47,7 @@ struct CalendarScreen: View {
     // MARK: 머리글
 
     private var controls: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Text(Day.format(Day.date(selected), "y년"))
                 .font(.system(size: 15)).foregroundStyle(Theme.sub)
             Spacer()
@@ -79,7 +79,7 @@ struct CalendarScreen: View {
                 let on = modeIndicator == m
                 Button {
                     mode = m
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) { modeIndicator = m }
+                    withAnimation(.easeOut(duration: 0.24)) { modeIndicator = m }
                 } label: {
                     Text(m.rawValue)
                         .font(.system(size: 15, weight: on ? .bold : .medium))
@@ -113,7 +113,7 @@ struct CalendarScreen: View {
                 let on = key == selected
                 let has = !store.events(on: key).isEmpty
                 Button { select(key) } label: {
-                    VStack(spacing: 6) {
+                    VStack(spacing: 8) {
                         Text(Day.names[Day.weekday(d)])
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(on || key == today ? Theme.accent : Theme.faint)
@@ -139,7 +139,7 @@ struct CalendarScreen: View {
         let base = Day.date(selected)
         let today = Day.today
         let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
-        return VStack(spacing: 6) {
+        return VStack(spacing: 8) {
             HStack(spacing: 2) {
                 ForEach(Day.mondayFirst, id: \.self) { n in
                     Text(Day.names[n]).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.faint)
@@ -152,7 +152,7 @@ struct CalendarScreen: View {
                     let list = store.events(on: key)
                     let on = key == selected
                     Button { select(key) } label: {
-                        VStack(spacing: 3) {
+                        VStack(spacing: 4) {
                             Text("\(Day.cal.component(.day, from: d))")
                                 .font(.system(size: 15, weight: key == today || on ? .bold : .medium))
                                 .foregroundStyle(on ? Color.white : (key == today ? Theme.accent : Theme.text))
@@ -192,7 +192,7 @@ struct CalendarScreen: View {
                     if !list.isEmpty {
                         Text(Day.format(d, "MMMMdEEEE"))
                             .font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.faint)
-                            .padding(.top, 10)
+                            .padding(.top, 12)
                         ForEach(list) { x in EventRow(item: x) { sheet = .schedule(x, isNew: false) } }
                     }
                 }
@@ -224,7 +224,7 @@ struct CalendarScreen: View {
                     drag = 0
                     move(dx < 0 ? 1 : -1)
                 } else {
-                    withAnimation(.snappy(duration: 0.18)) { drag = 0 }
+                    withAnimation(.easeOut(duration: 0.18)) { drag = 0 }
                 }
             }
     }
@@ -244,7 +244,7 @@ struct CalendarScreen: View {
         guard key != selected else { return }
         direction = key > selected ? 1 : -1
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.92)) { selected = key }
+            withAnimation(.easeOut(duration: 0.28)) { selected = key }
         }
     }
 }

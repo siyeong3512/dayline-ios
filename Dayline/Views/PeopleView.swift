@@ -14,7 +14,7 @@ struct PeopleView: View {
                 Button {
                     store.setActivePerson(nil)
                 } label: {
-                    HStack(spacing: 14) {
+                    HStack(spacing: 12) {
                         IconBadge(systemImage: "calendar", bg: Theme.pill, fg: Theme.faint, size: 44)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("없음").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
@@ -30,11 +30,11 @@ struct PeopleView: View {
                 .buttonStyle(.plain)
 
                 ForEach(store.settings.people) { p in
-                    HStack(spacing: 14) {
+                    HStack(spacing: 12) {
                         Button {
                             store.setActivePerson(p.id)
                         } label: {
-                            HStack(spacing: 14) {
+                            HStack(spacing: 12) {
                                 AvatarView(personID: p.id, version: store.avatarVersion, size: 44)
                                     .overlay(Circle().strokeBorder(Color(hex: p.colorHex ?? PersonColor.defaultHex), lineWidth: 2.5))
                                 VStack(alignment: .leading, spacing: 2) {
@@ -360,12 +360,12 @@ struct PersonToneView: View {
 /// 라벤더 계열 16색 중 하나 고르기
 struct PersonColorGrid: View {
     @Binding var selection: String?
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 8)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 8)
 
     var body: some View {
         let current = selection ?? PersonColor.defaultHex
-        VStack(alignment: .leading, spacing: 10) {
-            LazyVGrid(columns: columns, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(PersonColor.all, id: \.hex) { c in
                     Button { selection = c.hex } label: {
                         Circle()
@@ -386,6 +386,6 @@ struct PersonColorGrid: View {
                 .font(.system(size: 13.5, weight: .medium))
                 .foregroundStyle(Theme.faint)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 }

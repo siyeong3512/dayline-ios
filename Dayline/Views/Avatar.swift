@@ -76,7 +76,7 @@ struct NotificationPreview: View {
     var chatStyle = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             if chatStyle {
                 AvatarView(personID: personID, version: version, size: 38)
                     .overlay(alignment: .bottomTrailing) {

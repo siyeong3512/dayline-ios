@@ -190,7 +190,7 @@ struct SettingsView: View {
                 Text("지금은 \(p.name)의 말투(\(PersonToneView.label(p, settings: store.settings)))로 보내요. 보낸 사람 > 수정 > 말투에서 바꿔요.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("미리보기").font(.caption).foregroundStyle(.secondary)
                 ForEach([1440, 30, 10], id: \.self) { n in
                     Text("· \(ReminderOption.label(n)): " + Nag.line(settings: store.settings, item: sample, minutesBefore: n))

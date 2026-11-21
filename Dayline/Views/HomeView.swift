@@ -26,9 +26,9 @@ struct HomeView: View {
     @ViewBuilder
     private func nextUp(_ now: Date) -> some View {
         if let next = store.upNext(now: now) {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 IconBadge(systemImage: "clock.fill", bg: Theme.accentSoft, fg: Theme.accent, size: 46)
-                VStack(alignment: .leading, spacing: 2.5) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(TimeText.until(next.when, from: now) + (next.item.place.isEmpty ? "" : " · " + next.item.place))
                         .font(.system(size: 13.5)).foregroundStyle(Theme.faint)
                     Text(next.item.title)
@@ -39,9 +39,9 @@ struct HomeView: View {
                 SoftButton(title: "자세히") { sheet = .schedule(next.item, isNew: false) }
             }
         } else {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 IconBadge(systemImage: "sun.max.fill", bg: Theme.pill, fg: Theme.faint, size: 46)
-                VStack(alignment: .leading, spacing: 2.5) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("다가오는 일정").font(.system(size: 13.5)).foregroundStyle(Theme.faint)
                     Text("여유로운 하루예요").font(.system(size: 19.5, weight: .bold)).foregroundStyle(Theme.text)
                 }
@@ -65,9 +65,9 @@ struct HomeView: View {
                         Capsule().fill(Theme.accent).frame(width: max(geo.size.width * progress, progress > 0 ? 6 : 0))
                     }
                 }
-                .frame(height: 5)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+                .frame(height: 4)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
                 .animation(.easeOut(duration: 0.45), value: progress)
             }
             if tasks.isEmpty {
@@ -75,7 +75,7 @@ struct HomeView: View {
             } else {
                 ForEach(tasks) { task in
                     TodoRow(task: task, dayKey: key,
-                            onToggle: { withAnimation(.snappy) { store.toggle(task, on: key) } },
+                            onToggle: { withAnimation(.easeOut(duration: 0.2)) { store.toggle(task, on: key) } },
                             onEdit: { sheet = .todo(task, isNew: false) })
                 }
             }
@@ -122,7 +122,7 @@ struct TodoRow: View {
 
     var body: some View {
         let done = task.isDone(on: dayKey)
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             Button(action: onEdit) {
                 ListRow(badge: IconBadge(text: badgeText,
                                          bg: done ? Theme.pill : badgeBg,
@@ -138,9 +138,9 @@ struct TodoRow: View {
                 Text(done ? "완료" : "체크")
                     .font(.system(size: 14.5, weight: .semibold))
                     .foregroundStyle(done ? Color.white : Theme.pillText)
-                    .padding(.horizontal, 14.5)
-                    .frame(height: 35)
-                    .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(done ? Theme.accent : Theme.pill))
+                    .padding(.horizontal, 16)
+                    .frame(height: 36)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(done ? Theme.accent : Theme.pill))
             }
             .buttonStyle(PressStyle())
             .sensoryFeedback(.success, trigger: done) { _, new in new }

@@ -102,7 +102,7 @@ struct TimetableView: View {
                         Text("\(from + i)")
                             .font(.system(size: 10.5, weight: .medium))
                             .foregroundStyle(Theme.faint)
-                            .padding(.trailing, 5)
+                            .padding(.trailing, 4)
                             .frame(width: gutter, height: unit, alignment: .topTrailing)
                     }
                 }
