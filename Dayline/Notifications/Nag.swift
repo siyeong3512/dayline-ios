@@ -3,9 +3,10 @@ import Foundation
 /// 알림 문구(잔소리). 같은 일정·같은 알림 시점이면 늘 같은 문장을 골라서,
 /// 목소리 파일도 다시 만들 필요가 없게 한다.
 enum Nag {
-    static func line(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int, salt: String = "") -> String {
+    static func line(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int, salt: String = "", card: Bool = false) -> String {
         let tone = settings.effectiveTone
-        let pool = templates(settings: settings, tone: tone, minutesBefore: n)
+        var pool = templates(settings: settings, tone: tone, minutesBefore: n)
+        if card, tone == .custom, let c = settings.currentCustom?.cardPool(stage: stage(n)), !c.isEmpty { pool = c }
         guard !pool.isEmpty else { return "\(ReminderOption.amount(n)) 뒤 시작해요." }
         let seed = "\(item.id)|\(n)|\(tone.rawValue)|\(settings.currentCustom?.name ?? "")" + salt
         let pick = pool[Int(stableHash(seed) % UInt64(pool.count))]
@@ -15,6 +16,12 @@ enum Nag {
             .replacingOccurrences(of: "{place}", with: item.place.isEmpty ? "거기" : item.place)
             .replacingOccurrences(of: "{time}", with: item.time)
             .josaFixed
+    }
+
+    /// 잠금화면 카드 문구: 말투 파일에 카드 전용 문장(cardEarly/cardSoon/cardUrgent)이 있으면 그걸 쓰고,
+    /// 없으면 알림 문장을 쓴다. 카드는 늘 한 줄(나눠 보낸 조각은 이어 붙인다).
+    static func cardLine(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int, salt: String = "") -> String {
+        pieces(line(settings: settings, item: item, minutesBefore: n, salt: salt, card: true)).joined(separator: " ")
     }
 
     /// 설정 > 보낸 사람에서 고른 사람 이름 (없으면 nil → 알림 제목은 일정 이름)

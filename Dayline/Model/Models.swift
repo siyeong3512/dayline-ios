@@ -264,8 +264,12 @@ struct CustomTone: Codable, Hashable, Identifiable {
     var urgent: [String]
     /// 할 일 체크 알림 ({period} {count} 사용)
     var todo: [String]
+    /// 잠금화면 카드 전용 문장 (없으면 알림 문장을 쓴다)
+    var cardEarly: [String] = []
+    var cardSoon: [String] = []
+    var cardUrgent: [String] = []
 
-    enum CodingKeys: String, CodingKey { case id, name, sender, early, soon, urgent, todo }
+    enum CodingKeys: String, CodingKey { case id, name, sender, early, soon, urgent, todo, cardEarly, cardSoon, cardUrgent }
 
     init(name: String, sender: String? = nil, early: [String], soon: [String], urgent: [String], todo: [String] = []) {
         self.name = name
@@ -286,10 +290,24 @@ struct CustomTone: Codable, Hashable, Identifiable {
         soon = ((try? c.decode([String].self, forKey: .soon)) ?? []).filter { !$0.isEmpty }
         urgent = ((try? c.decode([String].self, forKey: .urgent)) ?? []).filter { !$0.isEmpty }
         todo = ((try? c.decode([String].self, forKey: .todo)) ?? []).filter { !$0.isEmpty }
+        cardEarly = ((try? c.decode([String].self, forKey: .cardEarly)) ?? []).filter { !$0.isEmpty }
+        cardSoon = ((try? c.decode([String].self, forKey: .cardSoon)) ?? []).filter { !$0.isEmpty }
+        cardUrgent = ((try? c.decode([String].self, forKey: .cardUrgent)) ?? []).filter { !$0.isEmpty }
     }
 
     var isUsable: Bool { !(early.isEmpty && soon.isEmpty && urgent.isEmpty) }
-    var count: Int { early.count + soon.count + urgent.count + todo.count }
+    var count: Int { early.count + soon.count + urgent.count + todo.count + cardEarly.count + cardSoon.count + cardUrgent.count }
+
+    /// 카드 전용 문장 (단계가 비면 다른 단계로 채운다, 전부 없으면 빈 배열)
+    func cardPool(stage: Int) -> [String] {
+        let order: [[String]]
+        switch stage {
+        case 0: order = [cardEarly, cardSoon, cardUrgent]
+        case 1: order = [cardSoon, cardEarly, cardUrgent]
+        default: order = [cardUrgent, cardSoon, cardEarly]
+        }
+        return order.first { !$0.isEmpty } ?? []
+    }
 
     /// 비어 있는 단계는 다른 단계 문장으로 채운다
     func pool(stage: Int) -> [String] {

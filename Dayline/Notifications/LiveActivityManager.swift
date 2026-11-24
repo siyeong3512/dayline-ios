@@ -145,10 +145,9 @@ enum LiveActivityManager {
         // 문구는 30분 칸마다 한 번씩 바뀐다 (2:17 남음 → '2시간' 문구, 2:00이 되면 다음 문구는 1:30에)
         let shown = bucket(minutesLeft: minutesLeft)
         lastBucket = shown
-        let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: shown, salt: "|r\(reroll)")
+        let line = settings.effectiveTone == .plain ? nil : Nag.cardLine(settings: settings, item: x, minutesBefore: shown, salt: "|r\(reroll)")
         let avatarURL = Store.activeAvatarURL(settings)
-        // 메인 문구를 나눠 보내면 카드 자리가 없어서 끼어들기는 쉰다
-        let extra = (line == nil || line!.contains("\n")) ? nil : cameo(for: x, bucket: shown, settings: settings)
+        let extra = line == nil ? nil : cameo(for: x, bucket: shown, settings: settings)
         return NextUpAttributes.ContentState(
             itemID: x.id,
             title: x.title,
@@ -184,7 +183,7 @@ enum LiveActivityManager {
         var s = settings
         s.activePersonID = other.id
         guard s.effectiveTone != .plain else { return nil }
-        let line = Nag.line(settings: s, item: x, minutesBefore: bucket, salt: "|cameo|r\(reroll)")
+        let line = Nag.cardLine(settings: s, item: x, minutesBefore: bucket, salt: "|cameo|r\(reroll)")
         let key = Store.activeAvatarURL(s).flatMap { shareAvatar($0, personID: other.id) }
         return (other.name, line, other.colorHex, key)
     }

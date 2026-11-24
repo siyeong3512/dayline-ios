@@ -60,7 +60,7 @@ struct NextUpLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if let line = s.line {
-                        Secret { Text(CardText.pieces(line).joined(separator: " ")) }
+                        Secret { Text(line) }
                             .font(.subheadline)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -186,20 +186,11 @@ struct NextUpLockScreen: View {
         URL(string: "pingapp://extend?id=\(state.itemID)&start=\(Int(state.start.timeIntervalSince1970))")!
     }
 
-    /// 나눠 보낸 말풍선 조각 (최대 3개, 넘치면 마지막에 붙인다)
-    private var chunks: [String] {
-        guard let raw = state.line else { return [] }
-        let p = CardText.pieces(raw)
-        return p.count > 3 ? Array(p.prefix(2)) + [p.dropFirst(2).joined(separator: " ")] : p
-    }
-    /// 말풍선 3개일 때는 160pt 안에 들어가도록 위아래를 조금 줄인다
-    private var triple: Bool { state.result == nil && !started && chunks.count >= 3 }
-
     // 잠금화면 카드는 높이가 최대 약 160pt. 위: 사진·제목·남은 시간 / 아래: 말풍선 또는 마무리 체크
     var body: some View {
-        VStack(alignment: .leading, spacing: triple ? 8 : 10) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
-                Face(state: state, size: triple ? 50 : 54)
+                Face(state: state, size: 54)
                 VStack(alignment: .leading, spacing: 2.5) {
                     Text(state.title)
                         .font(.system(size: 19.5, weight: .bold))
@@ -218,7 +209,7 @@ struct NextUpLockScreen: View {
             bottom
         }
         .padding(.horizontal, 15)
-        .padding(.vertical, triple ? 11 : 13)
+        .padding(.vertical, 13)
         .background(CardStyle.background(state))
         .overlay(
             ContainerRelativeShape()
@@ -280,27 +271,7 @@ struct NextUpLockScreen: View {
                         .background(Capsule().fill(Color.white.opacity(0.12)))
                 }
             }
-        } else if chunks.count >= 2 {
-            // 톡처럼 나눠 보낸 말풍선: 조각마다 이름을 붙이고 시작 위치를 맞춘다 (최대 3개)
-            VStack(alignment: .leading, spacing: triple ? 3 : 5) {
-                ForEach(Array(chunks.enumerated()), id: \.offset) { i, piece in
-                    HStack(alignment: .center, spacing: 7) {
-                        Group {
-                            if i == 0 {
-                                Image(systemName: "bubble.left.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(CardStyle.accent(state))
-                            } else {
-                                Color.clear
-                            }
-                        }
-                        .frame(width: 22, height: 12)
-                        message(name: state.sender, line: piece, color: CardStyle.accent(state), small: true, tiny: triple)
-                    }
-                    .padding(.leading, 4)
-                }
-            }
-        } else if let line = chunks.first {
+        } else if let line = state.line {
             let duo = state.cameoLine != nil
             // 끼어들 때: 왼쪽 22pt 칸에 (메인) 말풍선 아이콘 / (끼어든 사람) 작은 사진, 두 말풍선 시작 위치를 맞춘다
             VStack(alignment: .leading, spacing: 5) {
@@ -319,8 +290,7 @@ struct NextUpLockScreen: View {
                 if let cameo = state.cameoLine {
                     HStack(alignment: .center, spacing: 7) {
                         MiniFace(key: state.cameoAvatarKey, name: state.cameoName ?? "", color: CardStyle.accent(hex: state.cameoHex))
-                        message(name: state.cameoName, line: CardText.pieces(cameo).joined(separator: " "),
-                                color: CardStyle.accent(hex: state.cameoHex), small: true)
+                        message(name: state.cameoName, line: cameo, color: CardStyle.accent(hex: state.cameoHex), small: true)
                     }
                     .padding(.leading, 4)
                 }
@@ -329,8 +299,8 @@ struct NextUpLockScreen: View {
     }
 
     /// 이름은 늘 보이고, 문구는 잠금(Face ID 전)·상시표시(AOD)에서 "···"로 가린다
-    private func message(name: String?, line: String, color: Color, small: Bool, tiny: Bool = false) -> some View {
-        let size: CGFloat = tiny ? 12.5 : small ? 13.5 : 14.5
+    private func message(name: String?, line: String, color: Color, small: Bool) -> some View {
+        let size: CGFloat = small ? 13.5 : 14.5
         return HStack(alignment: .firstTextBaseline, spacing: 6) {
             if let name {
                 Text(name).font(.system(size: size, weight: .bold)).foregroundStyle(color)
@@ -345,7 +315,7 @@ struct NextUpLockScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, small ? 10 : 12)
-        .padding(.vertical, tiny ? 4 : small ? 6 : 8)
+        .padding(.vertical, small ? 6 : 8)
         .background(RoundedRectangle(cornerRadius: small ? 12 : 14, style: .continuous).fill(CardStyle.bubble))
     }
 
@@ -403,13 +373,5 @@ struct MiniFace: View {
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay(Circle().strokeBorder(color, lineWidth: 1.2))
-    }
-}
-
-/// 말투 문장의 줄바꿈(\n) = 나눠 보낸 메시지
-enum CardText {
-    static func pieces(_ s: String) -> [String] {
-        let p = s.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        return p.isEmpty ? [s] : p
     }
 }
