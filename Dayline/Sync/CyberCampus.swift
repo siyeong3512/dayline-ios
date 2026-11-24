@@ -309,9 +309,10 @@ struct SyncCyberIntent: AppIntent {
     static var title: LocalizedStringResource = "사이버캠퍼스 과제 가져오기"
     static var description = IntentDescription("서강대 사이버캠퍼스의 과제·퀴즈·시험 마감을 핑 일정으로 가져와요.")
 
+    /// 자동화용이라 결과 창 없이 조용히 끝낸다 (결과는 설정 > 사이버캠퍼스에서 확인)
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let n = try await CyberCampus.sync(store: Store.shared)
-        return .result(dialog: "과제·시험 \(n)개를 확인했어요.")
+    func perform() async throws -> some IntentResult {
+        _ = try? await CyberCampus.sync(store: Store.shared)
+        return .result()
     }
 }
