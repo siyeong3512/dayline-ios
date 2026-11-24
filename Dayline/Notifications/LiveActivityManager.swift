@@ -147,7 +147,8 @@ enum LiveActivityManager {
         lastBucket = shown
         let line = settings.effectiveTone == .plain ? nil : Nag.line(settings: settings, item: x, minutesBefore: shown, salt: "|r\(reroll)")
         let avatarURL = Store.activeAvatarURL(settings)
-        let extra = line == nil ? nil : cameo(for: x, bucket: shown, settings: settings)
+        // 메인 문구를 나눠 보내면 카드 자리가 없어서 끼어들기는 쉰다
+        let extra = (line == nil || line!.contains("\n")) ? nil : cameo(for: x, bucket: shown, settings: settings)
         return NextUpAttributes.ContentState(
             itemID: x.id,
             title: x.title,

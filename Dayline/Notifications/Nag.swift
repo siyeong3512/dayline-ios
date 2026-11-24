@@ -48,6 +48,15 @@ enum Nag {
     private static let friendTodo = ["야 {period} 할 일 {count}개 남았다. 자기 전에 끝내자.",
                                      "{period} 거 다 했냐? 아직 {count}개 남음."]
 
+    /// 말투 문장 안의 줄바꿈(\n)은 '여러 번 나눠 보내기'. 최대 4조각(넘치면 마지막에 붙인다)
+    static func pieces(_ s: String) -> [String] {
+        var p = s.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        if p.count > 4 { p = Array(p.prefix(3)) + [p.dropFirst(3).joined(separator: " ")] }
+        return p.isEmpty ? [s] : p
+    }
+
     /// 알림 제목: 보낸 사람이 있으면 그 사람 이름(톡처럼), 없으면 일정 이름
     static func title(settings: AppSettings, item: ScheduleItem) -> String {
         sender(settings: settings) ?? item.title
@@ -65,7 +74,7 @@ enum Nag {
     /// 목소리로 읽을 문장 (ㅋㅋ·ㅏ·이모지처럼 TTS가 이상하게 읽는 글자는 뺀다)
     static func spoken(settings: AppSettings, item: ScheduleItem, minutesBefore n: Int) -> String {
         if settings.effectiveTone == .plain { return "\(item.title), \(ReminderOption.amount(n)) 뒤에 시작해요." }
-        let text = line(settings: settings, item: item, minutesBefore: n)
+        let text = pieces(line(settings: settings, item: item, minutesBefore: n)).joined(separator: " ")
         if settings.effectiveTone == .custom { return speakable(text) }
         return "\(item.title). " + text
     }

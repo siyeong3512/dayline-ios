@@ -136,18 +136,39 @@ actor NotificationScheduler {
         generation += 1
         let gen = generation
         let todoList = Self.todoPlans(todos: todos, settings: settings)
-        let list = Self.plans(items: items, limit: Self.limit - todoList.count)
+        let budget = Self.limit - todoList.count - 1
+        let list = Self.plans(items: items, limit: budget)
         var requests: [UNNotificationRequest] = []
         var usedSounds = Set<String>()
 
         for p in list {
-            let content = UNMutableNotificationContent()
-            content.title = Nag.title(settings: settings, item: p.item)
-            content.body = Nag.body(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
-            content.threadIdentifier = Nag.sender(settings: settings).map { "sender-" + $0 } ?? p.item.id
+            let thread = Nag.sender(settings: settings).map { "sender-" + $0 } ?? p.item.id
             let spoken = Nag.spoken(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
-            guard let final = await decorate(content, spoken: spoken, settings: settings, gen: gen, used: &usedSounds) else { return }
-            requests.append(UNNotificationRequest(identifier: p.id, content: final, trigger: p.trigger))
+            let body = Nag.body(settings: settings, item: p.item, minutesBefore: p.minutesBefore)
+            // 말투에 줄바꿈이 있으면 톡처럼 2초 간격으로 여러 번 나눠 보낸다 (정보 줄은 마지막 조각에)
+            var parts = body.components(separatedBy: "\n")
+            let info = parts.count > 1 ? parts.removeLast() : nil
+            let chunks = settings.effectiveTone == .plain ? [body] : Nag.pieces(parts.joined(separator: "\n"))
+            guard requests.count + chunks.count <= budget else { break }
+            for (k, chunk) in chunks.enumerated() {
+                let content = UNMutableNotificationContent()
+                content.title = Nag.title(settings: settings, item: p.item)
+                if k == chunks.count - 1, let info, settings.effectiveTone != .plain {
+                    content.body = chunk + "\n" + info
+                } else {
+                    content.body = chunk
+                }
+                content.threadIdentifier = thread
+                guard let decorated = await decorate(content, spoken: spoken, settings: settings, gen: gen, used: &usedSounds) else { return }
+                var final = decorated
+                if k > 0, let m = decorated.mutableCopy() as? UNMutableNotificationContent {
+                    // 뒤 조각은 목소리 대신 짧은 기본음 (목소리를 켰으면 조용히)
+                    m.sound = settings.voiceEnabled ? nil : .default
+                    final = m
+                }
+                requests.append(UNNotificationRequest(identifier: k == 0 ? p.id : p.id + "|\(k)", content: final,
+                                                      trigger: Self.shifted(p.trigger, seconds: k * 2)))
+            }
         }
 
         for p in todoList {
@@ -178,6 +199,14 @@ actor NotificationScheduler {
         center.removeAllPendingNotificationRequests()
         for r in requests { try? await center.add(r) }
         voice.cleanup(keeping: usedSounds)
+    }
+
+    /// 같은 시각 + n초 (나눠 보내는 뒷 조각용)
+    static func shifted(_ t: UNCalendarNotificationTrigger, seconds: Int) -> UNCalendarNotificationTrigger {
+        guard seconds > 0 else { return t }
+        var c = t.dateComponents
+        c.second = (c.second ?? 0) + seconds
+        return UNCalendarNotificationTrigger(dateMatching: c, repeats: t.repeats)
     }
 
     /// 소리(목소리)·사진·카톡식 처리를 붙인다. 그 사이 일정이 또 바뀌었으면 nil
@@ -226,10 +255,23 @@ actor NotificationScheduler {
                                             voiceID: settings.voiceID) {
             content.sound = UNNotificationSound(named: UNNotificationSoundName(name))
         }
-        let final: UNNotificationContent = chat ? Self.chatContent(content, settings: settings) : content
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-        try? await center.add(UNNotificationRequest(identifier: "dayline-test-\(UUID().uuidString)",
-                                                    content: final, trigger: trigger))
+        var parts = content.body.components(separatedBy: "\n")
+        let info = parts.count > 1 ? parts.removeLast() : nil
+        let chunks = settings.effectiveTone == .plain ? [content.body] : Nag.pieces(parts.joined(separator: "\n"))
+        for (k, chunk) in chunks.enumerated() {
+            guard let c = content.mutableCopy() as? UNMutableNotificationContent else { continue }
+            if k == chunks.count - 1, let info, settings.effectiveTone != .plain {
+                c.body = chunk + "\n" + info
+            } else {
+                c.body = chunk
+            }
+            if k > 0 { c.sound = settings.voiceEnabled ? nil : .default }
+            if k > 0, !chat, let photo = Self.avatarAttachment(settings: settings) { c.attachments = [photo] }
+            let final: UNNotificationContent = chat ? Self.chatContent(c, settings: settings) : c
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(5 + k * 2), repeats: false)
+            try? await center.add(UNNotificationRequest(identifier: "dayline-test-\(UUID().uuidString)",
+                                                        content: final, trigger: trigger))
+        }
     }
 
     // MARK: 카톡처럼 (커뮤니케이션 알림, 실험)

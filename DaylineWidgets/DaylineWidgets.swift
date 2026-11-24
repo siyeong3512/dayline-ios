@@ -60,7 +60,7 @@ struct NextUpLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if let line = s.line {
-                        Secret { Text(line) }
+                        Secret { Text(CardText.pieces(line).joined(separator: " ")) }
                             .font(.subheadline)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -271,8 +271,12 @@ struct NextUpLockScreen: View {
                         .background(Capsule().fill(Color.white.opacity(0.12)))
                 }
             }
-        } else if let line = state.line {
-            let duo = state.cameoLine != nil
+        } else if let raw = state.line {
+            // 말투에 줄바꿈이 있으면 톡처럼 말풍선을 나눠 보여준다 (카드 높이 때문에 최대 2개)
+            let parts = CardText.pieces(raw)
+            let line = parts[0]
+            let more: String? = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : nil
+            let duo = state.cameoLine != nil || more != nil
             // 끼어들 때: 왼쪽 22pt 칸에 (메인) 말풍선 아이콘 / (끼어든 사람) 작은 사진, 두 말풍선 시작 위치를 맞춘다
             VStack(alignment: .leading, spacing: 5) {
                 if duo {
@@ -287,10 +291,15 @@ struct NextUpLockScreen: View {
                 } else {
                     message(name: state.sender, line: line, color: CardStyle.accent(state), small: false)
                 }
-                if let cameo = state.cameoLine {
+                if let more {
+                    // 같은 사람이 이어 보낸 말풍선: 이름 없이, 시작 위치는 위와 같게
+                    message(name: nil, line: more, color: CardStyle.accent(state), small: true)
+                        .padding(.leading, 4 + 22 + 7)
+                } else if let cameo = state.cameoLine {
                     HStack(alignment: .center, spacing: 7) {
                         MiniFace(key: state.cameoAvatarKey, name: state.cameoName ?? "", color: CardStyle.accent(hex: state.cameoHex))
-                        message(name: state.cameoName, line: cameo, color: CardStyle.accent(hex: state.cameoHex), small: true)
+                        message(name: state.cameoName, line: CardText.pieces(cameo).joined(separator: " "),
+                                color: CardStyle.accent(hex: state.cameoHex), small: true)
                     }
                     .padding(.leading, 4)
                 }
@@ -373,5 +382,13 @@ struct MiniFace: View {
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay(Circle().strokeBorder(color, lineWidth: 1.2))
+    }
+}
+
+/// 말투 문장의 줄바꿈(\n) = 나눠 보낸 메시지
+enum CardText {
+    static func pieces(_ s: String) -> [String] {
+        let p = s.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return p.isEmpty ? [s] : p
     }
 }
