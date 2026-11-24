@@ -65,18 +65,25 @@ enum LiveActivityManager {
     static func registerTick() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: tickTaskID, using: nil) { task in
             Task { @MainActor in
-                let store = Store.shared
-                await CyberCampus.syncIfNeeded(store: store)
-                let settings = store.settings
-                var next = store.upNext(now: Date())
-                if let e = settings.extended, e.until > Date(), let item = store.items.first(where: { $0.id == e.itemID }) {
-                    next = (item: item, when: e.until)
-                }
-                await apply(next: next, settings: settings, force: false)
-                scheduleTick(start: next?.when)
+                await CyberCampus.syncIfNeeded(store: Store.shared)
+                await refreshNow(store: Store.shared)
                 task.setTaskCompleted(success: true)
             }
         }
+    }
+
+    /// 백그라운드·단축어용: 끝날 때까지 기다리는 갱신. 띄우려던 다음 일정을 돌려준다.
+    @MainActor
+    @discardableResult
+    static func refreshNow(store: Store) async -> (item: ScheduleItem, when: Date)? {
+        let settings = store.settings
+        var next = store.upNext(now: Date())
+        if let e = settings.extended, e.until > Date(), let item = store.items.first(where: { $0.id == e.itemID }) {
+            next = (item: item, when: e.until)
+        }
+        await apply(next: next, settings: settings, force: false)
+        scheduleTick(start: next?.when)
+        return next
     }
 
     static func apply(next: (item: ScheduleItem, when: Date)?, settings: AppSettings, force: Bool) async {
