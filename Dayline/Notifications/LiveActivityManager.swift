@@ -104,7 +104,9 @@ enum LiveActivityManager {
             return
         }
 
-        let limit = force ? 86400 : window
+        // '지금 띄워보기'로 3시간보다 먼 일정을 띄웠으면, 평소 갱신(앱 다시 열기·15초 점검)이 그 카드를 지우지 않게 한다
+        let showing = next.map { n in current.contains { $0.content.state.itemID == n.item.id && $0.content.state.start == n.when } } ?? false
+        let limit = (force || showing) ? 86400 : window
         guard let next, next.when.timeIntervalSinceNow <= limit else {
             for a in current where a.content.state.result == nil { await a.end(nil, dismissalPolicy: .immediate) }
             return
