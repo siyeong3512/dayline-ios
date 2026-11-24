@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-15-intel  # arm64 러너 대기열이 막혀서 Intel 러너 사용
     timeout-minutes: 30
     env:
       VERSION: 1.0.${{ github.run_number }}
