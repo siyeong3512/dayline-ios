@@ -121,10 +121,16 @@ enum LiveActivityManager {
         // 카드를 지웠다가 새로 띄울 때만 문구(와 끼어들기)를 새로 뽑는다
         rerollLine()
         state = makeState(next.item, next.when, settings: settings)
-        for a in current { await a.end(nil, dismissalPolicy: .immediate) }
-        _ = try? Activity.request(attributes: NextUpAttributes(),
-                                  content: ActivityContent(state: state, staleDate: next.when),
-                                  pushType: nil)
+        // 새 카드를 먼저 띄우고, 성공했을 때만 옛 카드를 내린다.
+        // (백그라운드에서는 새 카드를 못 띄울 수 있는데, 먼저 지워버리면 카드가 통째로 사라진다)
+        do {
+            let fresh = try Activity.request(attributes: NextUpAttributes(),
+                                             content: ActivityContent(state: state, staleDate: next.when),
+                                             pushType: nil)
+            for a in current where a.id != fresh.id { await a.end(nil, dismissalPolicy: .immediate) }
+        } catch {
+            // 못 띄웠으면 옛 카드를 그대로 둔다 (다음에 앱을 열 때 다시 시도)
+        }
     }
 
     /// 카드를 새로 띄울 때마다 올라가는 번호. 카드 문구(와 끼어들기)를 새로 뽑는다.
