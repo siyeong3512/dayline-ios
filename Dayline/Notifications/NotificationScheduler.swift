@@ -158,7 +158,8 @@ actor NotificationScheduler {
                 } else {
                     content.body = chunk
                 }
-                content.threadIdentifier = thread
+                // 같은 묶음이면 잠금화면에서 한 장으로 접혀 보여서, 나눠 보낸 조각은 묶음을 따로 준다
+                content.threadIdentifier = k == 0 ? thread : thread + "|\(k)"
                 guard let decorated = await decorate(content, spoken: spoken, settings: settings, gen: gen, used: &usedSounds) else { return }
                 var final = decorated
                 if k > 0, let m = decorated.mutableCopy() as? UNMutableNotificationContent {
@@ -266,6 +267,7 @@ actor NotificationScheduler {
                 c.body = chunk
             }
             if k > 0 { c.sound = settings.voiceEnabled ? nil : .default }
+            if k > 0 { c.threadIdentifier = content.threadIdentifier + "|\(k)" }
             if k > 0, !chat, let photo = Self.avatarAttachment(settings: settings) { c.attachments = [photo] }
             let final: UNNotificationContent = chat ? Self.chatContent(c, settings: settings) : c
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(5 + k * 2), repeats: false)
